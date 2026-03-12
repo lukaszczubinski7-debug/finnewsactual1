@@ -23,6 +23,7 @@ export function createInitialFormState(): BriefRequest {
     query: "",
     context: "Geopolityka",
     geo_focus: "",
+    debug: false,
     window_hours: 72,
     list_limit: HARD_LIST_LIMIT,
     summary_k: DEFAULT_SUMMARY_K,

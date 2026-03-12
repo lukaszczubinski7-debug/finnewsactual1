@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 import logging
 from urllib.error import URLError
 
 import httpx
+from cachetools import TTLCache
 
 from finnews.errors import UpstreamNewsProviderError
 from finnews.settings import settings
@@ -14,6 +16,9 @@ _AXESSO_MAX_ATTEMPTS = 2
 _AXESSO_RETRY_BACKOFF_S = 0.5
 _DEFAULT_SNIPPET_COUNT = 50
 _QUOTA_FALLBACK_SNIPPET_COUNTS = (25, 10)
+_AXESSO_CACHE_TTL_S = 600
+_AXESSO_LIST_CACHE_MAXSIZE = 128
+_AXESSO_DETAILS_CACHE_MAXSIZE = 512
 
 
 def mask_key(val: str) -> str:
@@ -29,6 +34,14 @@ class AxessoClient:
         self.base_url = settings.axesso_base_url.rstrip("/")
         self.timeout = settings.axesso_timeout_s
         self.auth_mode = self._resolve_auth_mode()
+        self._list_cache: TTLCache[tuple[object, ...], dict] = TTLCache(
+            maxsize=_AXESSO_LIST_CACHE_MAXSIZE,
+            ttl=_AXESSO_CACHE_TTL_S,
+        )
+        self._details_cache: TTLCache[tuple[object, ...], dict] = TTLCache(
+            maxsize=_AXESSO_DETAILS_CACHE_MAXSIZE,
+            ttl=_AXESSO_CACHE_TTL_S,
+        )
 
     def _resolve_auth_mode(self) -> str:
         configured_mode = (settings.axesso_auth_mode or "auto").strip().lower()
@@ -177,6 +190,18 @@ class AxessoClient:
         response_text = (exc.response.text or "").casefold()
         return "quota exceeded" in response_text
 
+    @staticmethod
+    def _cache_lookup(cache: TTLCache[tuple[object, ...], dict], key: tuple[object, ...]) -> dict | None:
+        cached = cache.get(key)
+        if cached is None:
+            return None
+        return deepcopy(cached)
+
+    @staticmethod
+    def _cache_store(cache: TTLCache[tuple[object, ...], dict], key: tuple[object, ...], payload: dict) -> dict:
+        cache[key] = deepcopy(payload)
+        return deepcopy(payload)
+
     async def list_news(
         self,
         *,
@@ -185,6 +210,11 @@ class AxessoClient:
         snippet_count: int | None = None,
         subscription_key_param: str | None = None,
     ) -> dict:
+        cache_key = ("list_news", s or "", region or "", int(snippet_count) if snippet_count is not None else None, subscription_key_param or "")
+        cached = self._cache_lookup(self._list_cache, cache_key)
+        if cached is not None:
+            return cached
+
         url = f"{self.base_url}/news-v2-list"
         headers, header_name = self._headers()
         last_quota_error: httpx.HTTPStatusError | None = None
@@ -208,7 +238,7 @@ class AxessoClient:
                     params=params,
                     content=b"",
                 )
-                return response.json()
+                return self._cache_store(self._list_cache, cache_key, response.json())
             except httpx.HTTPStatusError as exc:
                 if self._is_quota_exceeded_error(exc):
                     last_quota_error = exc
@@ -235,7 +265,7 @@ class AxessoClient:
         region: str | None = None,
         snippet_count: int | None = None,
         subscription_key_param: str | None = None,
-    ) -> tuple[int, str]:
+    ) -> tuple[int, str, dict | None]:
         """
         Zwraca (status_code, response_text_trimmed_500).
         Nie rzuca wyjątku: NIE używaj raise_for_status().
@@ -270,17 +300,29 @@ class AxessoClient:
                 header_name=used_header_name,
                 header_value=used_header_value,
             )
-            return response.status_code, (response.text or "")[:500]
+            parsed_json: dict | None
+            try:
+                loaded = response.json()
+                parsed_json = loaded if isinstance(loaded, dict) else None
+            except Exception:
+                parsed_json = None
+            return response.status_code, (response.text or "")[:500], parsed_json
 
     async def get_details(self, news_uuid: str) -> dict:
+        cache_key = ("get_details", news_uuid)
+        cached = self._cache_lookup(self._details_cache, cache_key)
+        if cached is not None:
+            return cached
+
         url = f"{self.base_url}/news-v2-get-details"
         params = {"uuid": news_uuid}
         headers, header_name = self._headers()
 
-        return await self._request_json(
+        payload = await self._request_json(
             method="GET",
             url=url,
             headers=headers,
             header_name=header_name,
             params=params,
         )
+        return self._cache_store(self._details_cache, cache_key, payload)

@@ -20,3 +20,7 @@ class UpstreamNewsProviderError(RuntimeError):
 
 class NewsDataParsingError(ValueError):
     """Raised when upstream payloads cannot be normalized safely."""
+
+    def __init__(self, message: str, *, detail_payload: dict | None = None) -> None:
+        super().__init__(message)
+        self.detail_payload = detail_payload

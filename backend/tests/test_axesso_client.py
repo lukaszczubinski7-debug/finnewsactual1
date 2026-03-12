@@ -52,6 +52,92 @@ async def test_list_news_retries_with_lower_snippet_count_after_quota_exceeded(m
     assert result == payload
 
 
+@pytest.mark.anyio
+async def test_list_news_uses_ttl_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[int] = []
+    payload = {"data": {"contents": [{"id": "news-1"}]}}
+
+    class FakeAsyncClient:
+        def __init__(self, *_: object, **__: object) -> None:
+            pass
+
+        async def __aenter__(self) -> FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def request(
+            self,
+            method: str,
+            url: str,
+            *,
+            params: dict[str, str | int] | None = None,
+            headers: dict[str, str] | None = None,
+            content: bytes | None = None,
+        ) -> httpx.Response:
+            del headers, content
+            calls.append(1)
+            request = httpx.Request(method, url, params=params)
+            return httpx.Response(200, request=request, json=payload)
+
+    monkeypatch.setattr(axesso_module.httpx, "AsyncClient", FakeAsyncClient)
+
+    client = AxessoClient()
+    first = await client.list_news(s="iran", region="US", snippet_count=10)
+    second = await client.list_news(s="iran", region="US", snippet_count=10)
+
+    assert calls == [1]
+    assert first == second == payload
+
+
+@pytest.mark.anyio
+async def test_get_details_uses_ttl_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[int] = []
+    payload = {"id": "news-1", "title": "Cached details"}
+
+    class FakeAsyncClient:
+        def __init__(self, *_: object, **__: object) -> None:
+            pass
+
+        async def __aenter__(self) -> FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def request(
+            self,
+            method: str,
+            url: str,
+            *,
+            params: dict[str, str | int] | None = None,
+            headers: dict[str, str] | None = None,
+            content: bytes | None = None,
+        ) -> httpx.Response:
+            del headers, content
+            calls.append(1)
+            request = httpx.Request(method, url, params=params)
+            return httpx.Response(200, request=request, json=payload)
+
+    monkeypatch.setattr(axesso_module.httpx, "AsyncClient", FakeAsyncClient)
+
+    client = AxessoClient()
+    first = await client.get_details("news-1")
+    second = await client.get_details("news-1")
+
+    assert calls == [1]
+    assert first == second == payload
+
+
+def test_health_endpoint_returns_ok() -> None:
+    client = TestClient(main_module.app)
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 def test_brief_returns_429_for_quota_exceeded(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_run(**_: object) -> dict[str, object]:
         raise UpstreamNewsProviderError(

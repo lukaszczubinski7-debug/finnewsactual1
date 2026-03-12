@@ -1,469 +1,314 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 
-import type {
-  BriefResponse,
-  LongSummary,
-  MidSummary,
-  MidTheme,
-  ShortSummary,
-} from "../lib/types";
+import type { BriefResponse } from "../lib/types";
 
 type BriefResultProps = {
   result: BriefResponse;
 };
 
-function sortWatki(watki: MidTheme[]): MidTheme[] {
-  const order = { wysoka: 0, srednia: 1, niska: 2 };
-  return [...watki].sort((left, right) => order[left.waznosc] - order[right.waznosc]);
+type BriefItem = {
+  title: string;
+  body: string;
+};
+
+type QuickSummaryShape = {
+  kind: "quick";
+  mode: "quick";
+  summary: string;
+  invalid: boolean;
+};
+
+type ItemsSummaryShape = {
+  kind: "items";
+  headline: string;
+  mode: "standard" | "extended";
+  items: BriefItem[];
+};
+
+type SummaryShape = QuickSummaryShape | ItemsSummaryShape;
+
+function splitSentences(text: string): string[] {
+  return String(text || "")
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
-function styleLabel(style: BriefResponse["style"]): string {
+function isInterpretiveQuickSentence(sentence: string): boolean {
+  const lowered = String(sentence || "").toLowerCase();
+  const phrases = [
+    "moze spowodowac",
+    "moze wplynac",
+    "to moze",
+    "rynek moze",
+    "inwestorzy moga",
+    "wplyw na",
+    "implikacj",
+    "konsekwencj",
+    "scenario",
+    "scenariusz",
+  ];
+  if (phrases.some((phrase) => lowered.includes(phrase))) {
+    return true;
+  }
+  return /\b(moze|moga|mogl\w*|prawdopodob\w*|potencjal\w*|powin\w*|suger\w*|spowod\w*|doprowadz\w*)\b/i.test(lowered);
+}
+
+function hasQuickMetaMarkers(text: string): boolean {
+  const lowered = String(text || "").toLowerCase();
+  const phrases = [
+    "pytanie inwestycyjne",
+    "w centrum uwagi",
+    "horyzont decyzyjny",
+    "zakres analizy",
+    "priorytet",
+    "profil uzytkownika",
+    "wybrane regiony",
+    "na podstawie preferencji",
+    "podany temat",
+    "fokus geopolityczny",
+  ];
+  if (phrases.some((phrase) => lowered.includes(phrase))) {
+    return true;
+  }
+  return /(pytanie inwestycyjne|horyzont|profil|zakres analizy)\s*:/i.test(lowered);
+}
+
+function normalizeQuickSummary(text: string): string {
+  const cleaned = String(text || "")
+    .replace(/\s+/g, " ")
+    .replace(/^\s*[-*\u2022\d.)]+\s*/g, "")
+    .replace(/^(teza|fakty|analiza|wplyw na rynki|scenariusze|co monitorowac|podsumowanie)\s*[:\-]\s*/i, "")
+    .trim();
+
+  const sentences = splitSentences(cleaned)
+    .filter((sentence) => !isInterpretiveQuickSentence(sentence))
+    .slice(0, 3);
+  if (sentences.length === 0) {
+    return "W najnowszych depeszach dominuja informacje o wydarzeniach geopolitycznych, komunikatach rzadowych i notowaniach energii.";
+  }
+  return sentences.join(" ");
+}
+
+function normalizeBody(text: string): string {
+  const cleaned = String(text || "")
+    .replace(/\s+/g, " ")
+    .replace(/^\s*[-*\u2022\d.)]+\s*/g, "")
+    .trim();
+  const sentences = splitSentences(cleaned).slice(0, 3);
+  if (sentences.length === 0) {
+    return "Rynek pozostaje najbardziej wrazliwy na nowe sygnaly, ktore zmieniaja bilans ryzyka dla aktywow.";
+  }
+  if (sentences.length === 1) {
+    sentences.push("Najwazniejsze pozostaje to, czy kolejne informacje zmieniaja implikacje dla energii, FX i indeksow.");
+  }
+  return sentences.join(" ");
+}
+
+function normalizeMode(value: unknown, style: BriefResponse["style"]): "quick" | "standard" | "extended" {
+  const mode = String(value || "").trim().toLowerCase();
+  if (mode === "quick" || mode === "standard" || mode === "extended") {
+    return mode;
+  }
   if (style === "short") {
-    return "krotko";
+    return "quick";
   }
-  if (style === "mid") {
-    return "normalnie";
+  if (style === "long") {
+    return "extended";
   }
-  return "dlugo";
+  return "standard";
 }
 
-function formatSummaryForClipboard(result: BriefResponse): string {
-  if (result.brief) {
-    return result.brief;
+function boundsForMode(mode: "standard" | "extended"): { min: number; max: number } {
+  if (mode === "extended") {
+    return { min: 4, max: 5 };
   }
+  return { min: 3, max: 4 };
+}
 
-  if (result.style === "short") {
-    const summary = result.summary as ShortSummary;
-    return [
-      summary.co_sie_stalo,
-      summary.reakcja,
-      summary.konsekwencja_rynkowa,
-      summary.co_obserwowac,
-    ]
-      .filter(Boolean)
-      .join("\n");
-  }
-
-  if (result.style === "mid") {
-    const summary = result.summary as MidSummary;
-    return [
-      summary.tl_dr ? `TL;DR\n${summary.tl_dr}` : "",
-      ...sortWatki(summary.watki).map(
-        (watek) => `${watek.tytul} [${watek.waznosc}]\n${watek.tekst}`,
-      ),
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-  }
-
-  const summary = result.summary as LongSummary;
-  return [
-    ...summary.tematy.map(
-      (temat) =>
-        `${temat.tytul}\n${[
-          temat.stan_obecny,
-          temat.mechanizm_wplywu,
-          temat.konsekwencje,
-        ]
-          .filter(Boolean)
-          .join("\n")}`,
-    ),
-    summary.lancuch_przyczynowy.length
-      ? `Lancuch przyczynowy\n${summary.lancuch_przyczynowy.join("\n")}`
-      : "",
-    summary.implikacje_rynkowe.length
-      ? `Implikacje rynkowe\n${summary.implikacje_rynkowe
-          .map((impact) => `${impact.obszar}: ${impact.mechanizm}`)
-          .join("\n")}`
-      : "",
-  ]
+function fallbackQuickSummary(result: BriefResponse): string {
+  const fromSources = result.sources
+    .map((source) => String(source.title || "").trim())
     .filter(Boolean)
-    .join("\n\n");
+    .slice(0, 3)
+    .join(" ");
+  return normalizeQuickSummary(fromSources);
 }
 
-function renderShortSummary(summary: ShortSummary) {
-  const rows = [
-    { label: "Co sie stalo", value: summary.co_sie_stalo },
-    { label: "Najwazniejsza reakcja", value: summary.reakcja },
-    { label: "Bezposrednia konsekwencja rynkowa", value: summary.konsekwencja_rynkowa },
-    { label: "Co obserwowac", value: summary.co_obserwowac },
+function fallbackItems(result: BriefResponse, mode: "standard" | "extended"): BriefItem[] {
+  const geo = result.focus.geo_focus || "kluczowy obszar geopolityczny";
+  const base: BriefItem[] = [
+    {
+      title: "Rynek energii pozostaje glownym nosnikiem premii geopolitycznej",
+      body: normalizeBody(`Wokol tematu ${geo} inwestorzy najpierw wyceniaja ryzyko dla energii i kosztow transportu. To najszybciej przenosi sie na sentyment dla aktywow ryzykownych i defensywnych.`),
+    },
+    {
+      title: "Skala reakcji aktywow zalezy od twardych sygnalow eskalacji",
+      body: normalizeBody("Sama retoryka czesto podnosi zmiennosc, ale trwalszy ruch pojawia sie po potwierdzonych decyzjach lub zdarzeniach operacyjnych. Najwrazliwsze pozostaja instrumenty powiazane z energia, FX i awersja do ryzyka."),
+    },
+    {
+      title: "Tempo naplywu wiarygodnych informacji bedzie kluczowe dla kierunku rynku",
+      body: normalizeBody("Gdy rynek dostaje spojne potwierdzenia, wycena szybciej stabilizuje nowy zakres ryzyka. Przy sygnalach sprzecznych dominuja szybkie przejscia miedzy risk-on i risk-off."),
+    },
+    {
+      title: "Efekt drugiej rundy moze przejsc przez inflacje i oczekiwania stop procentowych",
+      body: normalizeBody("Jesli presja na energie utrzyma sie dluzej, inwestorzy moga podniesc wyceny ryzyka makro i kosztu pieniadza. Wtedy geopolityka zaczyna dzialac nie tylko przez naglowki, ale przez fundamenty polityki monetarnej."),
+    },
+    {
+      title: "Najbardziej liczy sie selekcja aktywow wedlug wrazliwosci, a nie szeroki risk-off",
+      body: normalizeBody("Przewaga informacyjna wynika z rozroznienia, ktore klasy aktywow sa bezposrednio dotkniete, a ktore tylko chwilowo podazaja za sentymentem. To ogranicza ryzyko reakcji opartych wyłącznie na ogolnym tle geopolitycznym."),
+    },
   ];
 
-  return (
-    <div style={{ display: "grid", gap: 12 }}>
-      {rows.map((row) => (
-        <div key={row.label} style={{ padding: "14px 16px", borderRadius: 14, backgroundColor: "#f5f8fb" }}>
-          <div style={{ marginBottom: 6, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#1b6782" }}>
-            {row.label}
-          </div>
-          <div style={{ color: "#17324d", lineHeight: 1.6 }}>{row.value || "Brak danych."}</div>
-        </div>
-      ))}
-    </div>
-  );
+  const { min, max } = boundsForMode(mode);
+  const target = mode === "extended" ? 5 : 4;
+  return base.slice(0, Math.max(min, Math.min(max, target)));
 }
 
-function renderMidSummary(summary: MidSummary) {
-  const watki = sortWatki(summary.watki);
-
-  return (
-    <div style={{ display: "grid", gap: 16 }}>
-      {summary.tl_dr ? (
-        <section style={{ padding: 16, borderRadius: 16, backgroundColor: "#eef5fb", border: "1px solid #dbe3ee" }}>
-          <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#1b6782" }}>
-            TL;DR
-          </div>
-          <div style={{ color: "#17324d", lineHeight: 1.6 }}>{summary.tl_dr}</div>
-        </section>
-      ) : null}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-          gap: 14,
-        }}
-      >
-        {watki.map((watek) => (
-          <article
-            key={`${watek.waznosc}-${watek.tytul}`}
-            style={{
-              padding: 18,
-              borderRadius: 16,
-              border: "1px solid #dbe3ee",
-              backgroundColor: "#fbfdff",
-            }}
-          >
-            <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#1b6782" }}>
-              Waznosc: {watek.waznosc}
-            </div>
-            <h3 style={{ margin: 0, fontSize: 18, color: "#10253f" }}>{watek.tytul}</h3>
-            <p style={{ margin: "10px 0 0", color: "#29425c", lineHeight: 1.7 }}>{watek.tekst}</p>
-          </article>
-        ))}
-      </div>
-    </div>
+function normalizeSummary(summary: unknown, result: BriefResponse): SummaryShape {
+  const mode = normalizeMode(
+    summary && typeof summary === "object" ? (summary as Record<string, unknown>).mode : undefined,
+    result.style,
   );
-}
 
-function renderLongSummary(summary: LongSummary) {
-  return (
-    <div style={{ display: "grid", gap: 18 }}>
-      <section>
-        <h3 style={{ margin: "0 0 10px", fontSize: 18, color: "#10253f" }}>Tematy</h3>
-        <div style={{ display: "grid", gap: 12 }}>
-          {summary.tematy.length ? (
-            summary.tematy.map((temat) => (
-              <article key={temat.tytul} style={{ padding: 16, borderRadius: 16, backgroundColor: "#f5f8fb" }}>
-                <h4 style={{ margin: 0, fontSize: 16, color: "#17324d" }}>{temat.tytul}</h4>
-                <p style={{ margin: "10px 0 0", color: "#29425c" }}>{temat.stan_obecny || "Brak danych."}</p>
-                {temat.mechanizm_wplywu ? (
-                  <p style={{ margin: "8px 0 0", color: "#29425c" }}>{temat.mechanizm_wplywu}</p>
-                ) : null}
-                {temat.konsekwencje ? (
-                  <p style={{ margin: "8px 0 0", color: "#29425c" }}>{temat.konsekwencje}</p>
-                ) : null}
-                {temat.ryzyka.length ? (
-                  <ul style={{ margin: "10px 0 0", paddingLeft: 18, color: "#29425c" }}>
-                    {temat.ryzyka.map((ryzyko) => (
-                      <li key={ryzyko}>{ryzyko}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </article>
-            ))
-          ) : (
-            <div style={{ color: "#62758a" }}>Brak danych.</div>
-          )}
-        </div>
-      </section>
+  if (!summary || typeof summary !== "object") {
+    if (mode === "quick") {
+      return { kind: "quick", mode: "quick", summary: fallbackQuickSummary(result), invalid: false };
+    }
+    return {
+      kind: "items",
+      headline: "Brief geopolityczny",
+      mode,
+      items: fallbackItems(result, mode),
+    };
+  }
 
-      <section>
-        <h3 style={{ margin: "0 0 10px", fontSize: 18, color: "#10253f" }}>Lancuch przyczynowy</h3>
-        {summary.lancuch_przyczynowy.length ? (
-          <ul style={{ margin: 0, paddingLeft: 18, color: "#29425c" }}>
-            {summary.lancuch_przyczynowy.map((chain) => (
-              <li key={chain}>{chain}</li>
-            ))}
-          </ul>
-        ) : (
-          <div style={{ color: "#62758a" }}>Brak danych.</div>
-        )}
-      </section>
+  const raw = summary as Record<string, unknown>;
+  if (mode === "quick") {
+    const fromSummary = typeof raw.summary === "string" ? raw.summary : "";
+    if (fromSummary.trim()) {
+      if (hasQuickMetaMarkers(fromSummary)) {
+        return { kind: "quick", mode: "quick", summary: fromSummary, invalid: true };
+      }
+      return { kind: "quick", mode: "quick", summary: normalizeQuickSummary(fromSummary), invalid: false };
+    }
 
-      <section>
-        <h3 style={{ margin: "0 0 10px", fontSize: 18, color: "#10253f" }}>Implikacje rynkowe</h3>
-        {summary.implikacje_rynkowe.length ? (
-          <div style={{ display: "grid", gap: 10 }}>
-            {summary.implikacje_rynkowe.map((impact) => (
-              <article key={impact.obszar} style={{ padding: 14, borderRadius: 14, backgroundColor: "#f5f8fb" }}>
-                <strong style={{ display: "block", marginBottom: 6, color: "#17324d" }}>{impact.obszar}</strong>
-                <span style={{ color: "#29425c" }}>{impact.mechanizm}</span>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div style={{ color: "#62758a" }}>Brak danych.</div>
-        )}
-      </section>
+    const fromItem = Array.isArray(raw.items)
+      ? raw.items
+          .filter((item) => item && typeof item === "object")
+          .map((item) => String((item as Record<string, unknown>).body || "").trim())
+          .find(Boolean) || ""
+      : "";
 
-      <section>
-        <h3 style={{ margin: "0 0 10px", fontSize: 18, color: "#10253f" }}>Scenariusze</h3>
-        {summary.scenariusze.length ? (
-          <div style={{ display: "grid", gap: 10 }}>
-            {summary.scenariusze.map((scenario) => (
-              <article key={scenario.nazwa} style={{ padding: 14, borderRadius: 14, backgroundColor: "#f5f8fb" }}>
-                <strong style={{ display: "block", marginBottom: 6, color: "#17324d" }}>{scenario.nazwa}</strong>
-                <div style={{ color: "#29425c", lineHeight: 1.6 }}>
-                  <div>{scenario.trigger || "Brak triggera."}</div>
-                  {scenario.mechanizm ? <div>{scenario.mechanizm}</div> : null}
-                  {scenario.aktywa_wrazliwe.length ? (
-                    <div>Obszary wrazliwe: {scenario.aktywa_wrazliwe.join(", ")}</div>
-                  ) : null}
-                  {scenario.horyzont ? <div>Horyzont: {scenario.horyzont}</div> : null}
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div style={{ color: "#62758a" }}>Brak danych.</div>
-        )}
-      </section>
-    </div>
-  );
+    return {
+      kind: "quick",
+      mode: "quick",
+      summary: normalizeQuickSummary(fromItem || fallbackQuickSummary(result)),
+      invalid: false,
+    };
+  }
+
+  const { min, max } = boundsForMode(mode);
+  const rawItems = Array.isArray(raw.items)
+    ? raw.items
+    : Array.isArray(raw.blocks)
+      ? raw.blocks
+      : [];
+
+  const items = rawItems
+    .filter((item) => item && typeof item === "object")
+    .map((item) => item as Record<string, unknown>)
+    .map((item) => ({
+      title: String(item.title || "").trim(),
+      body: normalizeBody(String(item.body || "")),
+    }))
+    .filter((item) => item.title && item.body)
+    .slice(0, max);
+
+  const normalizedItems = items.length >= min ? items : fallbackItems(result, mode).slice(0, min);
+
+  return {
+    kind: "items",
+    headline: String(raw.headline || "Brief geopolityczny").trim(),
+    mode,
+    items: normalizedItems,
+  };
 }
 
 export default function BriefResult({ result }: BriefResultProps) {
-  const [showRawJson, setShowRawJson] = useState(false);
   const [showSources, setShowSources] = useState(false);
-  const [copyLabel, setCopyLabel] = useState("Kopiuj podsumowanie");
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(formatSummaryForClipboard(result));
-      setCopyLabel("Skopiowano");
-      window.setTimeout(() => setCopyLabel("Kopiuj podsumowanie"), 1500);
-    } catch {
-      setCopyLabel("Blad kopiowania");
-      window.setTimeout(() => setCopyLabel("Kopiuj podsumowanie"), 1500);
-    }
-  };
-
-  const handleDownload = () => {
-    const blob = new Blob([JSON.stringify(result, null, 2)], {
-      type: "application/json;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "podsumowanie-geopolityczne.json";
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+  const summary = normalizeSummary(result.summary, result);
+  const isQuick = summary.kind === "quick";
 
   return (
     <section
       style={{
-        padding: 24,
+        padding: 30,
         borderRadius: 20,
-        border: "1px solid #d6dde8",
-        backgroundColor: "#ffffff",
-        boxShadow: "0 14px 40px rgba(16, 37, 63, 0.08)",
+        border: "1px solid rgba(186, 205, 231, 0.22)",
+        background: "linear-gradient(180deg, rgba(19,28,40,0.97), rgba(10,16,25,0.97))",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          marginBottom: 18,
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: 24, color: "#10253f" }}>Geopolityczne podsumowanie</h2>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={handleCopy}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 999,
-              border: "1px solid #c9d4e3",
-              backgroundColor: "#f5f8fb",
-              cursor: "pointer",
-            }}
-          >
-            {copyLabel}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowSources((value) => !value)}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 999,
-              border: "1px solid #c9d4e3",
-              backgroundColor: "#f5f8fb",
-              cursor: "pointer",
-            }}
-          >
-            {showSources ? "Ukryj zrodla" : "Pokaz zrodla"}
-          </button>
-        </div>
-      </div>
+      <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gap: 26 }}>
+        {summary.kind === "quick" ? (
+          <>
+            <h2 style={{ margin: 0, color: "#e5f0ff", fontSize: 30 }}>Podsumowanie</h2>
+            <p style={{ margin: 0, color: "#d6e6ff", fontSize: 18, lineHeight: 1.7 }}>
+              {summary.invalid
+                ? "Nie udalo sie wygenerowac poprawnego podsumowania. Sprobuj zawezic pytanie lub profil."
+                : summary.summary}
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 style={{ margin: 0, color: "#e5f0ff", fontSize: 30 }}>{summary.headline || "Brief geopolityczny"}</h2>
+            <div style={{ display: "grid", gap: 24 }}>
+              {summary.items.map((item, index) => (
+                <div key={`${item.title}-${index}`} style={{ display: "grid", gap: 10 }}>
+                  <h3 style={{ margin: 0, color: "#dcecff", fontSize: 27, lineHeight: 1.25 }}>{item.title}</h3>
+                  <p style={{ margin: 0, color: "#d6e6ff", fontSize: 18, lineHeight: 1.7 }}>{item.body}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
-      <div style={{ display: "grid", gap: 18 }}>
-        <div
-          style={{
-            padding: "14px 16px",
-            borderRadius: 14,
-            backgroundColor: "#f5f8fb",
-            color: "#17324d",
-            display: "flex",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
-          <strong>Kontekst: {result.context}</strong>
-          <span>Okno: {result.window_hours}h</span>
-          <span>Styl: {styleLabel(result.style)}</span>
-          <span>Kontynenty: {result.continents.join(", ")}</span>
-        </div>
-
-        {result.focus.geo_focus || result.focus.custom_query ? (
-          <div
-            style={{
-              padding: "14px 16px",
-              borderRadius: 14,
-              border: "1px solid #dbe3ee",
-              backgroundColor: "#fbfdff",
-              color: "#17324d",
-              display: "grid",
-              gap: 6,
-            }}
-          >
-            {result.focus.geo_focus ? (
-              <div>
-                <strong>Fokus geopolityczny:</strong> {result.focus.geo_focus}
-              </div>
-            ) : null}
-            {result.focus.custom_query ? (
-              <div>
-                <strong>Dodatkowe pytanie:</strong> {result.focus.custom_query}
-              </div>
-            ) : null}
+        {!isQuick ? (
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              onClick={() => setShowSources((value) => !value)}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 999,
+                border: "1px solid rgba(161, 187, 224, 0.36)",
+                backgroundColor: "rgba(27, 39, 56, 0.9)",
+                color: "#d7e6ff",
+                cursor: "pointer",
+              }}
+            >
+              {showSources ? "Ukryj zrodla" : "Pokaz zrodla"}
+            </button>
           </div>
         ) : null}
 
-        <article
-          style={{
-            padding: 22,
-            borderRadius: 18,
-            border: "1px solid #dbe3ee",
-            background:
-              "linear-gradient(180deg, rgba(245, 248, 251, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%)",
-          }}
-        >
-          <div
-            style={{
-              marginBottom: 10,
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: "#1b6782",
-            }}
-          >
-            Podsumowanie
-          </div>
-
-          {result.style === "short" ? renderShortSummary(result.summary as ShortSummary) : null}
-          {result.style === "mid" ? renderMidSummary(result.summary as MidSummary) : null}
-          {result.style === "long" ? renderLongSummary(result.summary as LongSummary) : null}
-        </article>
-
-        {showSources ? (
-          <div style={{ display: "grid", gap: 12 }}>
+        {!isQuick && showSources ? (
+          <div style={{ display: "grid", gap: 10 }}>
             {result.sources.map((source) => (
-              <article
-                key={`${source.id}-${source.url ?? "brak-url"}`}
-                style={{
-                  padding: 16,
-                  borderRadius: 16,
-                  border: "1px solid #dbe3ee",
-                  backgroundColor: "#fbfdff",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: 18, color: "#10253f" }}>{source.title}</h3>
-                    <div style={{ marginTop: 6, color: "#58708a", fontSize: 14 }}>
-                      {source.provider || "Nieznane zrodlo"}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right", color: "#58708a", fontSize: 14 }}>
-                    <div>{source.published_at || "Brak czasu publikacji"}</div>
-                  </div>
+              <article key={`${source.id}-${source.url ?? "brak-url"}`} style={{ borderBottom: "1px solid rgba(157, 183, 216, 0.16)", paddingBottom: 10 }}>
+                <div style={{ color: "#dce9ff", fontSize: 17 }}>{source.title}</div>
+                <div style={{ color: "#9fb6d8", fontSize: 14 }}>
+                  {(source.provider || "Nieznane zrodlo")} | {source.published_at || "Brak czasu publikacji"}
                 </div>
-
                 {source.url ? (
-                  <div style={{ marginTop: 12 }}>
-                    <a href={source.url} target="_blank" rel="noreferrer" style={{ color: "#0d4d8b", fontWeight: 700 }}>
-                      Otworz zrodlo
-                    </a>
-                  </div>
+                  <a href={source.url} target="_blank" rel="noreferrer" style={{ color: "#8ab4f0", fontWeight: 700 }}>
+                    Otworz zrodlo
+                  </a>
                 ) : null}
               </article>
             ))}
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={handleDownload}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 999,
-                  border: "1px solid #c9d4e3",
-                  backgroundColor: "#f5f8fb",
-                  cursor: "pointer",
-                }}
-              >
-                Pobierz JSON
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowRawJson((value) => !value)}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 999,
-                  border: "1px solid #c9d4e3",
-                  backgroundColor: "#f5f8fb",
-                  cursor: "pointer",
-                }}
-              >
-                {showRawJson ? "Ukryj JSON" : "Pokaz JSON"}
-              </button>
-            </div>
-
-            {showRawJson ? (
-              <pre
-                style={{
-                  margin: 0,
-                  padding: 20,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  borderRadius: 16,
-                  backgroundColor: "#10253f",
-                  color: "#edf4ff",
-                  fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace",
-                  overflowX: "auto",
-                }}
-              >
-                {JSON.stringify(result, null, 2)}
-              </pre>
-            ) : null}
           </div>
         ) : null}
       </div>

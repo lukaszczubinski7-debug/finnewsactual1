@@ -89,6 +89,7 @@ class BriefSource(BaseModel):
 
 
 class BriefResponse(BaseModel):
+    status: Literal["ok", "fallback"] = "ok"
     style: Literal["short", "mid", "long"]
     context: str
     window_hours: int

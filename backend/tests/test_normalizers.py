@@ -1,3 +1,6 @@
+import pytest
+
+from finnews.errors import NewsDataParsingError
 from finnews.normalizers.details_normalizer import extract_text_from_markup, normalize_details
 from finnews.normalizers.list_normalizer import normalize_list
 from finnews.utils.text import detect_mojibake, fix_mojibake
@@ -87,6 +90,126 @@ def test_normalize_list_supports_legacy_contents_format() -> None:
             "isHosted": True,
         }
     ]
+
+
+def test_normalize_list_supports_data_items_format() -> None:
+    raw = {
+        "status": "OK",
+        "data": {
+            "items": [
+                {
+                    "id": "it-1",
+                    "content": {
+                        "id": "it-news-1",
+                        "title": "Energy routes remain at risk",
+                        "summary": "Shipping insurers monitor disruptions.",
+                        "provider": {"displayName": "Reuters"},
+                        "pubDate": "2026-03-01T08:30:00Z",
+                        "canonicalUrl": {"url": "https://example.com/it-news-1"},
+                    },
+                }
+            ]
+        },
+    }
+
+    result = normalize_list(raw)
+
+    assert len(result) == 1
+    assert result[0]["id"] == "it-news-1"
+
+
+def test_normalize_list_supports_data_stream_format() -> None:
+    raw = {
+        "status": "OK",
+        "data": {
+            "stream": [
+                {
+                    "id": "st-1",
+                    "content": {
+                        "id": "st-news-1",
+                        "title": "Central bank signals caution",
+                        "summary": "Rates path remains data-dependent.",
+                        "provider": {"displayName": "Bloomberg"},
+                        "pubDate": "2026-03-01T09:10:00Z",
+                    },
+                }
+            ]
+        },
+    }
+
+    result = normalize_list(raw)
+
+    assert len(result) == 1
+    assert result[0]["id"] == "st-news-1"
+
+
+def test_normalize_list_supports_data_as_list() -> None:
+    raw = {
+        "status": "OK",
+        "data": [
+            {
+                "id": "dl-1",
+                "content": {
+                    "id": "dl-news-1",
+                    "title": "Direct list payload from provider",
+                    "summary": "Schema changed but still recoverable.",
+                    "provider": {"displayName": "AP"},
+                    "pubDate": "2026-03-01T09:20:00Z",
+                },
+            }
+        ],
+    }
+
+    result = normalize_list(raw)
+
+    assert len(result) == 1
+    assert result[0]["id"] == "dl-news-1"
+
+
+def test_normalize_list_supports_finance_result_news_path() -> None:
+    raw = {
+        "status": "OK",
+        "data": {
+            "finance": {
+                "result": [
+                    {
+                        "news": [
+                            {
+                                "id": "yf-1",
+                                "content": {
+                                    "id": "yf-news-1",
+                                    "title": "Yahoo finance nested news path",
+                                    "summary": "Path data.finance.result[0].news should parse.",
+                                    "provider": {"displayName": "Reuters"},
+                                    "pubDate": "2026-03-01T10:00:00Z",
+                                },
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+    }
+
+    result = normalize_list(raw)
+
+    assert len(result) == 1
+    assert result[0]["id"] == "yf-news-1"
+
+
+def test_normalize_list_raises_when_news_list_missing() -> None:
+    raw = {"status": "OK", "data": {"foo": "bar"}}
+
+    with pytest.raises(NewsDataParsingError) as exc_info:
+        normalize_list(raw)
+
+    assert "No news list found in upstream payload" in str(exc_info.value)
+    detail_payload = exc_info.value.detail_payload or {}
+    assert detail_payload.get("message") == "No news list found in upstream payload"
+    assert "debug" in detail_payload
+    debug = detail_payload["debug"]
+    assert debug.get("top_level_keys") == ["status", "data"]
+    assert debug.get("data_type") == "dict"
 
 
 def test_normalize_details_repairs_text_fields_and_limits_body() -> None:

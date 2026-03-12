@@ -10,7 +10,7 @@ import type { BriefRequest, ContinentCode } from "../lib/types";
 
 type BriefFormProps = {
   values: BriefRequest;
-  onChange: (field: keyof BriefRequest, value: string | number | string[]) => void;
+  onChange: (field: keyof BriefRequest, value: string | number | string[] | boolean) => void;
   onSubmit: () => void;
   disabled?: boolean;
 };
@@ -168,35 +168,18 @@ export default function BriefForm({ values, onChange, onSubmit, disabled = false
 
         <label>
           <span style={{ display: "block", marginBottom: 6, fontWeight: 600, color: "#17324d" }}>
-            Fokus geopolityczny
-          </span>
-          <input
-            type="text"
-            value={values.geo_focus}
-            onChange={(event) => onChange("geo_focus", event.target.value)}
-            disabled={disabled}
-            placeholder="Iran / Izrael / Gaza / Ukraina / Ciesnina Ormuz"
-            style={fieldStyle}
-          />
-          <p style={helperTextStyle}>
-            Wpisz glowny watek lub aktorow. To wzmacnia ranking newsow, ktore o tym mowia.
-          </p>
-        </label>
-
-        <label>
-          <span style={{ display: "block", marginBottom: 6, fontWeight: 600, color: "#17324d" }}>
-            Dodatkowe pytanie
+            Pytanie strategiczne
           </span>
           <input
             type="text"
             value={values.query}
             onChange={(event) => onChange("query", event.target.value)}
             disabled={disabled}
-            placeholder="Np. wplyw konfliktu w Iranie na cene ropy"
+            placeholder="Wpisz glowne pytanie, ktore brief ma przeanalizowac"
             style={fieldStyle}
           />
           <p style={helperTextStyle}>
-            Doprecyzowanie pytania lub kata analizy. System wybierze i podsumuje newsy pod tym katem.
+            Priorytet wejscia: pytanie -&gt; profil -&gt; regiony.
           </p>
         </label>
 
@@ -250,6 +233,24 @@ export default function BriefForm({ values, onChange, onSubmit, disabled = false
                 placeholder="NVDA, TSLA lub LPP.WA"
                 style={fieldStyle}
               />
+            </label>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                color: "#17324d",
+                fontWeight: 600,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={values.debug}
+                onChange={(event) => onChange("debug", event.target.checked)}
+                disabled={disabled}
+              />
+              Zwracaj debug z backendu
             </label>
           </div>
         </details>

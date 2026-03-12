@@ -5,17 +5,24 @@ from urllib.error import URLError
 from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
 
 from finnews.api.responses import utf8_json
 from finnews.api.schemas import BriefFocus, BriefRequest, BriefResponse, BriefSource
 from finnews.clients.axesso import mask_key
+from finnews.db.dependencies import get_db
 from finnews.errors import NewsDataParsingError, UpstreamNewsProviderError
+from finnews.models import User, UserPreference
+from finnews.normalizers.list_normalizer import find_list_and_path, normalize_items
+from finnews.security import get_current_user_optional
 from finnews.services.brief_service import BriefService, INTERNAL_SELECT_K
+from finnews.services.profile_service import ProfileService
 from finnews.settings import settings
 
 router = APIRouter()
 svc = BriefService()
+profile_svc = ProfileService()
 logger = logging.getLogger(__name__)
 
 
@@ -119,19 +126,33 @@ async def axesso_diagnose(
     attempts: list[dict] = []
 
     for header_name, prefix, value, used_subscription_key_param in deduped_candidates[:max_attempts]:
-        status_code, error_text = await svc.client.list_news_with_headers(
+        status_code, error_text, parsed_json = await svc.client.list_news_with_headers(
             headers=({header_name: value} if header_name else {}),
             s=s,
             region=region,
             snippet_count=snippet_count,
             subscription_key_param=(api_key if used_subscription_key_param else None),
         )
+        top_level_keys: list[str] = []
+        detected_path: str | None = None
+        raw_count = 0
+        normalized_count = 0
+        if isinstance(parsed_json, dict):
+            items, detected_path, meta_debug = find_list_and_path(parsed_json)
+            top_level_keys = list(meta_debug.get("top_level_keys", []))
+            if isinstance(items, list):
+                raw_count = len(items)
+                normalized_count = len(normalize_items(items, limit=snippet_count))
         attempt = {
             "header": _header_label(header_name),
             "value_masked": mask_key(value),
             "used_subscription_key_param": used_subscription_key_param,
             "status_code": status_code,
             "error": _truncate(error_text, 500),
+            "top_level_keys": top_level_keys,
+            "detected_path": detected_path,
+            "raw_count": raw_count,
+            "normalized_count": normalized_count,
         }
         attempts.append(attempt)
 
@@ -156,6 +177,10 @@ async def axesso_diagnose(
                             "value_masked": item["value_masked"],
                             "used_subscription_key_param": item["used_subscription_key_param"],
                             "status_code": item["status_code"],
+                            "top_level_keys": item.get("top_level_keys", []),
+                            "detected_path": item.get("detected_path"),
+                            "raw_count": item.get("raw_count", 0),
+                            "normalized_count": item.get("normalized_count", 0),
                         }
                         for item in attempts
                     ],
@@ -172,8 +197,16 @@ async def axesso_diagnose(
 
 
 @router.post("/brief", response_model=BriefResponse)
-async def brief(req: BriefRequest):
+async def brief(
+    req: BriefRequest,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
+):
     request_id = str(uuid4())
+    preference_context = ""
+    if current_user is not None:
+        preference = db.query(UserPreference).filter(UserPreference.user_id == current_user.id).first()
+        preference_context = profile_svc.build_preference_context(preference)
     try:
         result = await svc.run(
             continents=req.continents,
@@ -188,9 +221,11 @@ async def brief(req: BriefRequest):
             style=req.style,
             debug=req.debug,
             window_hours=req.window_hours,
+            preference_context=preference_context or None,
             request_id=request_id,
         )
         response = BriefResponse(
+            status=result.get("status", "ok"),
             style=result["style"],
             context=result["context"],
             window_hours=result["window_hours"],
@@ -217,10 +252,20 @@ async def brief(req: BriefRequest):
                     "hint": "Lower snippetCount or wait for quota reset",
                 },
             )
-        raise HTTPException(status_code=502, detail="Upstream news provider error")
+        if isinstance(exc, UpstreamNewsProviderError):
+            detail_payload = getattr(exc, "detail_payload", None)
+            if detail_payload:
+                raise HTTPException(status_code=502, detail=detail_payload)
+            if str(exc):
+                raise HTTPException(status_code=502, detail={"message": str(exc)})
+        raise HTTPException(status_code=502, detail={"message": "Upstream news provider error"})
     except NewsDataParsingError as exc:
         logger.exception("brief request_id=%s parsing_error", request_id)
-        raise HTTPException(status_code=500, detail=str(exc))
+        message = str(exc) or "Could not parse upstream news data"
+        detail_payload = getattr(exc, "detail_payload", None)
+        if req.debug and detail_payload:
+            raise HTTPException(status_code=502, detail=detail_payload)
+        raise HTTPException(status_code=502, detail={"message": message})
     except HTTPException:
         raise
     except Exception:

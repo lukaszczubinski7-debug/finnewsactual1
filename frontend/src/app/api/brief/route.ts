@@ -19,6 +19,9 @@ export async function POST(request: Request): Promise<Response> {
       method: "POST",
       headers: {
         "Content-Type": request.headers.get("content-type") || "application/json; charset=utf-8",
+        ...(request.headers.get("authorization")
+          ? { Authorization: request.headers.get("authorization") as string }
+          : {}),
       },
       body,
       cache: "no-store",

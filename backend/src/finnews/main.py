@@ -7,11 +7,15 @@ from fastapi.exceptions import RequestValidationError
 
 from finnews.api.responses import UTF8JSONResponse
 from finnews.api.routes import router
+from finnews.api.routes_auth import router as auth_router
+from finnews.api.routes_profile import router as profile_router
 
 sys.stdout.reconfigure(encoding="utf-8")
 
 app = FastAPI(title="Fin News Agent MVP", default_response_class=UTF8JSONResponse)
 app.include_router(router)
+app.include_router(auth_router)
+app.include_router(profile_router)
 
 
 @app.exception_handler(HTTPException)

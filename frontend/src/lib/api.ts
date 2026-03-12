@@ -1,7 +1,21 @@
 import { HARD_LIST_LIMIT, ensureContinents } from "./briefDefaults";
-import type { APIError, BriefRequest, BriefResponse } from "./types";
+import type {
+  APIError,
+  AuthUser,
+  BriefRequest,
+  BriefResponse,
+  LoginRequest,
+  LoginResponse,
+  RegisterRequest,
+  UserPreference,
+  UserPreferenceUpdate,
+} from "./types";
 
 const BRIEF_ENDPOINT = "/api/brief";
+const AUTH_REGISTER_ENDPOINT = "/api/auth/register";
+const AUTH_LOGIN_ENDPOINT = "/api/auth/login";
+const AUTH_ME_ENDPOINT = "/api/auth/me";
+const PROFILE_PREFERENCES_ENDPOINT = "/api/profile/preferences";
 
 function parseTickers(tickers: string): string[] {
   return tickers
@@ -14,14 +28,14 @@ function createApiError(message: string, status: number): APIError {
   return { message, status };
 }
 
-function extractErrorMessage(payload: unknown, status: number): string {
+function parseApiError(payload: unknown, status: number): APIError {
   if (
     typeof payload === "object" &&
     payload !== null &&
     "message" in payload &&
     typeof payload.message === "string"
   ) {
-    return payload.message;
+    return createApiError(payload.message, status);
   }
 
   if (
@@ -30,7 +44,7 @@ function extractErrorMessage(payload: unknown, status: number): string {
     "detail" in payload &&
     typeof payload.detail === "string"
   ) {
-    return payload.detail;
+    return createApiError(payload.detail, status);
   }
 
   if (
@@ -42,19 +56,37 @@ function extractErrorMessage(payload: unknown, status: number): string {
     "message" in payload.detail &&
     typeof payload.detail.message === "string"
   ) {
-    return payload.detail.message;
+    const detail = payload.detail as { message: string; debug?: unknown };
+    return {
+      message: detail.message,
+      status,
+      debug: detail.debug,
+    };
   }
 
-  return `Zapytanie nie powiodlo sie (status ${status})`;
+  return createApiError(`Zapytanie nie powiodlo sie (status ${status})`, status);
 }
 
-export async function postBrief(req: BriefRequest): Promise<BriefResponse> {
+async function parseJsonSafe(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders(token?: string): HeadersInit {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export async function postBrief(req: BriefRequest, token?: string): Promise<BriefResponse> {
   const requestPayload = {
     continents: ensureContinents(req.continents),
     tickers: parseTickers(req.tickers),
     query: req.query.trim() || null,
     context: "Geopolityka" as const,
     geo_focus: req.geo_focus.trim() || null,
+    debug: req.debug,
     window_hours: req.window_hours,
     list_limit: HARD_LIST_LIMIT,
     summary_k: req.summary_k,
@@ -66,20 +98,15 @@ export async function postBrief(req: BriefRequest): Promise<BriefResponse> {
       method: "POST",
       headers: {
         "Content-Type": "application/json; charset=utf-8",
+        ...authHeaders(token),
       },
       body: JSON.stringify(requestPayload),
     });
 
-    let responsePayload: unknown = null;
-
-    try {
-      responsePayload = await response.json();
-    } catch {
-      responsePayload = null;
-    }
+    const responsePayload = await parseJsonSafe(response);
 
     if (!response.ok) {
-      throw createApiError(extractErrorMessage(responsePayload, response.status), response.status);
+      throw parseApiError(responsePayload, response.status);
     }
 
     if (
@@ -107,4 +134,106 @@ export async function postBrief(req: BriefRequest): Promise<BriefResponse> {
 
     throw createApiError("Nie udalo sie polaczyc z backendem.", 0);
   }
+}
+
+export async function register(payload: RegisterRequest): Promise<AuthUser> {
+  const response = await fetch(AUTH_REGISTER_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify(payload),
+  });
+
+  const responsePayload = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw parseApiError(responsePayload, response.status);
+  }
+  return responsePayload as AuthUser;
+}
+
+export async function login(payload: LoginRequest): Promise<LoginResponse> {
+  const response = await fetch(AUTH_LOGIN_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify(payload),
+  });
+
+  const responsePayload = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw parseApiError(responsePayload, response.status);
+  }
+  return responsePayload as LoginResponse;
+}
+
+export async function getMe(token: string): Promise<AuthUser> {
+  const response = await fetch(AUTH_ME_ENDPOINT, {
+    method: "GET",
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+
+  const responsePayload = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw parseApiError(responsePayload, response.status);
+  }
+  return responsePayload as AuthUser;
+}
+
+export async function deleteMe(token: string): Promise<void> {
+  const response = await fetch(AUTH_ME_ENDPOINT, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+
+  if (!response.ok) {
+    const responsePayload = await parseJsonSafe(response);
+    throw parseApiError(responsePayload, response.status);
+  }
+}
+
+export async function getPreferences(token: string): Promise<UserPreference> {
+  const response = await fetch(PROFILE_PREFERENCES_ENDPOINT, {
+    method: "GET",
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+
+  const responsePayload = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw parseApiError(responsePayload, response.status);
+  }
+  return responsePayload as UserPreference;
+}
+
+export async function putPreferences(token: string, payload: UserPreferenceUpdate): Promise<UserPreference> {
+  const response = await fetch(PROFILE_PREFERENCES_ENDPOINT, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      ...authHeaders(token),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const responsePayload = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw parseApiError(responsePayload, response.status);
+  }
+  return responsePayload as UserPreference;
+}
+
+export async function patchPreferences(token: string, payload: UserPreferenceUpdate): Promise<UserPreference> {
+  const response = await fetch(PROFILE_PREFERENCES_ENDPOINT, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      ...authHeaders(token),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const responsePayload = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw parseApiError(responsePayload, response.status);
+  }
+  return responsePayload as UserPreference;
 }

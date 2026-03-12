@@ -12,6 +12,7 @@ from finnews.services.brief_service import (
     normalize_continents,
     normalize_query,
     normalize_style,
+    _prompt_template_name_for_style,
 )
 
 
@@ -67,6 +68,12 @@ def test_brief_request_defaults_and_legacy_continent_merge() -> None:
     assert request.summary_k == 5
     assert "select_k" not in request.model_dump()
     assert legacy.continents == ["ME"]
+
+
+def test_prompt_template_selection_uses_short_or_long() -> None:
+    assert _prompt_template_name_for_style("short").endswith("short.md")
+    assert _prompt_template_name_for_style("mid").endswith("long.md")
+    assert _prompt_template_name_for_style("long").endswith("long.md")
 
 
 def _detail_from_item(item: dict[str, object]) -> dict[str, object]:
@@ -204,11 +211,17 @@ async def test_run_short_summary_has_required_keys() -> None:
     assert result["style"] == "short"
     assert set(result["summary"]) == {
         "co_sie_stalo",
-        "reakcja",
-        "konsekwencja_rynkowa",
+        "najwazniejsza_reakcja",
+        "bezposrednia_konsekwencja_rynkowa",
         "co_obserwowac",
+        "sources",
     }
-    assert not ({"event", "reaction", "immediate_impact"} & set(result["summary"]))
+    assert all(result["summary"][key] for key in [
+        "co_sie_stalo",
+        "najwazniejsza_reakcja",
+        "bezposrednia_konsekwencja_rynkowa",
+        "co_obserwowac",
+    ])
     assert result["sources"]
 
 
@@ -260,10 +273,19 @@ async def test_run_mid_summary_has_required_keys() -> None:
     )
 
     assert result["style"] == "mid"
-    assert set(result["summary"]) == {"watki", "tl_dr"}
-    assert 2 <= len(result["summary"]["watki"]) <= 5
-    assert {"tytul", "waznosc", "tekst"} <= set(result["summary"]["watki"][0])
-    assert not ({"themes", "title", "text"} & set(result["summary"]))
+    assert set(result["summary"]) == {
+        "co_sie_stalo",
+        "najwazniejsza_reakcja",
+        "bezposrednia_konsekwencja_rynkowa",
+        "co_obserwowac",
+        "sources",
+    }
+    assert all(result["summary"][key] for key in [
+        "co_sie_stalo",
+        "najwazniejsza_reakcja",
+        "bezposrednia_konsekwencja_rynkowa",
+        "co_obserwowac",
+    ])
 
 
 @pytest.mark.anyio
@@ -315,12 +337,18 @@ async def test_run_long_summary_has_required_keys() -> None:
 
     assert result["style"] == "long"
     assert set(result["summary"]) == {
-        "tematy",
-        "lancuch_przyczynowy",
-        "implikacje_rynkowe",
-        "scenariusze",
+        "co_sie_stalo",
+        "najwazniejsza_reakcja",
+        "bezposrednia_konsekwencja_rynkowa",
+        "co_obserwowac",
+        "sources",
     }
-    assert not ({"topics", "causal_chain", "sector_impact", "geo_risk", "scenarios"} & set(result["summary"]))
+    assert all(result["summary"][key] for key in [
+        "co_sie_stalo",
+        "najwazniejsza_reakcja",
+        "bezposrednia_konsekwencja_rynkowa",
+        "co_obserwowac",
+    ])
 
 
 @pytest.mark.anyio
@@ -428,12 +456,23 @@ async def test_run_filters_out_items_older_than_window_hours() -> None:
 async def test_run_trims_continents_to_three_before_fetching() -> None:
     service = BriefService()
     fetch_calls: list[dict[str, object]] = []
+    sample_item = {
+        "id": "trim-1",
+        "title": "Regional tensions continue",
+        "summary": "Market participants monitor energy routes.",
+        "tickers": [],
+        "provider": "Reuters",
+        "pubDate": "2026-03-03T10:00:00Z",
+        "clickUrl": "https://example.com/trim-1",
+    }
 
     async def fetch_normalized(**kwargs: object) -> list[dict]:
         fetch_calls.append(dict(kwargs))
-        return []
+        return [sample_item]
 
     async def fetch_normalized_many(ids: list[str]) -> list[dict]:
+        if sample_item["id"] in ids:
+            return [_detail_from_item(sample_item)]
         return []
 
     service.list_service = SimpleNamespace(fetch_normalized=fetch_normalized)
@@ -455,6 +494,43 @@ async def test_run_trims_continents_to_three_before_fetching() -> None:
 
     assert result["continents"] == ["NA", "EU", "ME"]
     assert [call["region"] for call in fetch_calls] == ["US", "GB", "AE"]
+
+
+@pytest.mark.anyio
+async def test_run_returns_fallback_when_no_items_selected_and_exposes_debug_counts() -> None:
+    service = BriefService()
+
+    async def fetch_normalized(**_: object) -> list[dict]:
+        return []
+
+    async def fetch_normalized_many(ids: list[str]) -> list[dict]:
+        return []
+
+    service.list_service = SimpleNamespace(fetch_normalized=fetch_normalized)
+    service.details_service = SimpleNamespace(fetch_normalized_many=fetch_normalized_many)
+
+    result = await service.run(
+        region=None,
+        continents=["NA"],
+        tickers=[],
+        query="war",
+        list_limit=20,
+        select_k=10,
+        summary_k=5,
+        style="normalnie",
+        context="Geopolityka",
+        geo_focus=None,
+        window_hours=72,
+        debug=True,
+    )
+
+    assert result["status"] == "fallback"
+    assert result["summary"]["co_sie_stalo"]
+    assert result["summary"]["najwazniejsza_reakcja"]
+    assert result["summary"]["bezposrednia_konsekwencja_rynkowa"]
+    assert result["summary"]["co_obserwowac"]
+    assert result["summary"]["sources"] == []
+    assert result["debug"]["list_fetch_status"] == "ok"
 
 
 @pytest.mark.anyio

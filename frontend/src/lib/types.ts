@@ -18,6 +18,7 @@ export type BriefRequest = {
   query: string;
   context: BriefContext;
   geo_focus: string;
+  debug: boolean;
   window_hours: 24 | 72 | 168;
   list_limit: number;
   summary_k: number;
@@ -31,9 +32,15 @@ export type BriefFocus = {
 
 export type ShortSummary = {
   co_sie_stalo: string;
-  reakcja: string;
-  konsekwencja_rynkowa: string;
+  najwazniejsza_reakcja: string;
+  bezposrednia_konsekwencja_rynkowa: string;
   co_obserwowac: string;
+  sources: Array<{
+    title: string;
+    url: string;
+    publisher: string;
+    published_at: string;
+  }>;
 };
 
 export type MidTheme = {
@@ -75,7 +82,12 @@ export type LongSummary = {
   scenariusze: Scenario[];
 };
 
-export type BriefSummary = ShortSummary | MidSummary | LongSummary;
+export type QuickSummary = {
+  mode: "quick";
+  summary: string;
+};
+
+export type BriefSummary = QuickSummary | ShortSummary | MidSummary | LongSummary;
 
 export type BriefSource = {
   id: string;
@@ -86,6 +98,7 @@ export type BriefSource = {
 };
 
 export type BriefResponse = {
+  status: "ok" | "fallback";
   style: ResponseStyle;
   context: string;
   window_hours: number;
@@ -100,4 +113,45 @@ export type BriefResponse = {
 export type APIError = {
   message: string;
   status: number;
+  debug?: unknown;
+};
+
+export type AuthUser = {
+  id: number;
+  email: string;
+  is_active: boolean;
+};
+
+export type RegisterRequest = {
+  email: string;
+  password: string;
+};
+
+export type LoginRequest = {
+  email: string;
+  password: string;
+};
+
+export type LoginResponse = {
+  access_token: string;
+  token_type: "bearer";
+  user: AuthUser;
+};
+
+export type UserPreference = {
+  search_profile_text: string | null;
+  response_style: string | null;
+  interested_assets: string[];
+  interested_regions: string[];
+  interested_topics: string[];
+  notes: string | null;
+};
+
+export type UserPreferenceUpdate = {
+  search_profile_text?: string | null;
+  response_style?: string | null;
+  interested_assets?: string[];
+  interested_regions?: string[];
+  interested_topics?: string[];
+  notes?: string | null;
 };

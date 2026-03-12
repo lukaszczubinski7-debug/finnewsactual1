@@ -54,6 +54,14 @@ class LLMClient:
         )
         return uuids[:k]
 
+    async def complete(self, messages: list[dict[str, str]], temperature: float = 0.2) -> str:
+        resp = await self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=temperature,
+        )
+        return (resp.choices[0].message.content or "").strip()
+
     async def summarize(
         self,
         ticker_sections: list[dict[str, Any]],

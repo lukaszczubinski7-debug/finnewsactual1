@@ -24,9 +24,14 @@ class Settings(BaseSettings):
     # LLM (opcjonalnie)
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
+    llm_top_k: int = Field(default=5, alias="LLM_TOP_K")
 
     # App
     app_env: str = Field(default="dev", alias="APP_ENV")
+    database_url: str = Field(default="sqlite:///./finnews.db", alias="DATABASE_URL")
+    jwt_secret_key: str = Field(default="change-me-in-prod", alias="JWT_SECRET_KEY")
+    jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
+    jwt_access_token_expire_minutes: int = Field(default=60 * 24, alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES")
 
 
 settings = Settings()

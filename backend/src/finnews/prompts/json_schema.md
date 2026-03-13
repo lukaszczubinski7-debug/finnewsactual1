@@ -24,8 +24,11 @@ Dla mode=standard lub mode=extended:
 }
 
 Reguly:
-- quick: summary jako jeden akapit 1-3 zdania, bez list, bez sekcji, bez meta-komentarzy.
-- quick: kazde zdanie to fakt z newsow, bez opinii, bez prognoz, bez interpretacji, bez zaleznosci przyczynowo-skutkowych.
+- quick: summary jako jeden akapit 3-6 zdan, bez list, bez sekcji, bez meta-komentarzy.
+- quick: kazde zdanie = jeden osobny fakt lub wydarzenie (kto, co, gdzie, kiedy) — nie lacz kilku tematow w jedno zdanie.
+- quick: zero opinii, prognoz, interpretacji, konkluzji ani zaleznosci przyczynowo-skutkowych.
+- quick: nie uzywaj sformulowan "moze prowadzic do", "moze spowodowac", "budzi niepokoj", "sytuacja pozostaje dynamiczna".
+- quick: brak powtorzen — kazdy news tylko raz.
 - standard: 3-4 tematy.
 - extended: 4-5 tematow.
 - Nigdy nie zwracaj wiecej niz 5 tematow.

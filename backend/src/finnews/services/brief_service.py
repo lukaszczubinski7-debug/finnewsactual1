@@ -2408,28 +2408,15 @@ class BriefService:
         continents: list[str],
         query: str | None,
     ) -> tuple[list[dict[str, Any]], int]:
-        raw_items: list[dict[str, Any]] = []
-        region_codes = [
-            region
-            for continent in continents
-            for region in CONTINENT_TO_AXESSO_REGIONS.get(continent, [])
-        ]
-        semaphore = asyncio.Semaphore(MAX_CONCURRENT_REGION_FETCHES)
-
-        async def fetch_region(region: str) -> list[dict[str, Any]]:
-            async with semaphore:
-                return await self.list_service.fetch_normalized(
-                    s=query,
-                    region=region,
-                    limit=FETCH_LIMIT_PER_REGION,
-                )
-
-        batches = await asyncio.gather(*(fetch_region(region) for region in region_codes))
-        fetched_total = 0
-        for batch in batches:
-            fetched_total += len(batch)
-            raw_items.extend(batch)
-        return _dedupe_items(raw_items), fetched_total
+        # Always fetch from US region — the only one supported by current Axesso plan.
+        # US Yahoo Finance carries global news (Reuters, Bloomberg, AP) covering all regions.
+        # Region-specific filtering is handled downstream by LLM based on user's continent selection.
+        raw_items = await self.list_service.fetch_normalized(
+            s=query,
+            region="US",
+            limit=FETCH_LIMIT_PER_REGION,
+        )
+        return _dedupe_items(raw_items), len(raw_items)
 
     async def run(
         self,

@@ -39,26 +39,12 @@ Debug mode:
 - If diagnosis finds a working header, copy `working.example_env` values into `backend/.env`.
 - If upstream still returns Azure APIM `missing subscription key`, set `AXESSO_TRY_SUBSCRIPTION_KEY_PARAM=true` to test query-param fallback.
 
-## Backend dev run
-
 ## Uruchomienie lokalne
 
-Uruchom projekt lokalnie z katalogu root repo:
-
 ```powershell
-cd C:\Users\Administrator\finnewsactual1\backend; uv run alembic upgrade head; cd C:\Users\Administrator\finnewsactual1; .\dev.ps1
+.\start.ps1
 ```
 
-Skrypt `dev.ps1` uruchamia backend i frontend w osobnych oknach PowerShell.
+Nastepnie otworz: **http://localhost:3000**
 
-From `backend/`, start the development server with:
-
-```powershell
-.\scripts\run_dev.ps1
-```
-
-The wrapper keeps the console in UTF-8 and runs:
-
-```powershell
-uv run uvicorn --app-dir src finnews.main:app --reload --reload-exclude .venv --host 127.0.0.1 --port 8000
-```
+Skrypt wykonuje migracje bazy danych, a nastepnie uruchamia backend i frontend w osobnych oknach PowerShell.

@@ -1751,13 +1751,13 @@ def _validate_quick_summary(
     sentences = [sentence for sentence in _split_sentences(cleaned) if _is_quick_fact_sentence(sentence)]
     if not sentences:
         return False
-    if len(sentences) > 3:
+    if len(sentences) > 6:
         return False
-    compact = " ".join(sentences[:3])
+    compact = " ".join(sentences[:6])
     if _looks_like_user_input_paraphrase(compact, user_inputs, sources):
         return False
-    if not _quick_summary_mentions_news(compact, sources):
-        return False
+    # NOTE: _quick_summary_mentions_news Jaccard check removed — it rejects valid Polish
+    # LLM output because source titles are in English (low token overlap by design).
     return True
 
 
@@ -1779,7 +1779,7 @@ def _is_quick_fact_sentence(sentence: str) -> bool:
     return len(words) >= 4
 
 
-def _compress_quick_summary_text(text: str, *, min_sentences: int = 1, max_sentences: int = 3) -> str:
+def _compress_quick_summary_text(text: str, *, min_sentences: int = 1, max_sentences: int = 6) -> str:
     candidates: list[str] = []
     for sentence in _split_sentences(_clean_quick_summary_text(text)):
         if not _is_quick_fact_sentence(sentence):
@@ -1845,14 +1845,14 @@ def _build_quick_summary(
 
     if ranked_candidates:
         ranked_candidates.sort(key=lambda row: (-row[0], row[1]))
-        candidate_summary = " ".join(sentence for _, _, sentence in ranked_candidates[:3])
+        candidate_summary = " ".join(sentence for _, _, sentence in ranked_candidates[:6])
         if _validate_quick_summary(candidate_summary, sources=sources, user_inputs=inputs):
             return candidate_summary
 
     fallback_from_sources = _compress_quick_summary_text(
-        " ".join(str(source.get("title") or "") for source in sources[:3]),
+        " ".join(str(source.get("title") or "") for source in sources[:6]),
         min_sentences=1,
-        max_sentences=3,
+        max_sentences=6,
     )
     if fallback_from_sources and _validate_quick_summary(fallback_from_sources, sources=sources, user_inputs=inputs):
         return fallback_from_sources
@@ -1994,6 +1994,9 @@ def _normalize_analytical_summary(
         "geopolitical_context": _non_empty_text(base.get("geopolitical_context"), ""),
         "sources": output_sources,
     }
+    # Preserve items from LLM response for standard/extended mode
+    if isinstance(base.get("items"), list):
+        normalized["items"] = base["items"]
     return normalized
 
 
@@ -2299,9 +2302,9 @@ async def _generate_summary_via_llm(
         improve_instruction = (
             "Wynik nie przeszedl quality gate. Popraw JSON tak, aby:\n"
             "- zwracal tylko mode=quick oraz summary,\n"
-            "- summary bylo jednym akapitem 1-3 zdania,\n"
-            "- kazde zdanie opisywalo fakt z newsow,\n"
-            "- bez prognoz, bez opinii, bez interpretacji i bez zaleznosci przyczynowo-skutkowych,\n"
+            "- summary bylo jednym akapitem 3-6 zdan (kazde zdanie = jeden osobny fakt),\n"
+            "- kazde zdanie opisywalo konkretny fakt: kto, co, gdzie, kiedy,\n"
+            "- bez prognoz, bez opinii, bez interpretacji, bez konkluzji i bez zaleznosci przyczynowo-skutkowych,\n"
             "- nie zawieralo fraz meta: Pytanie inwestycyjne, W centrum uwagi, Horyzont decyzyjny, Zakres analizy, Profil, Wybrane regiony, Brief, Fokus geopolityczny,\n"
             "- nie zawieralo list, sekcji, bulletow, meta-komentarzy i technicznych slow debug/fallback/upstream.\n"
             "Zwroc ponownie tylko JSON."
@@ -2311,7 +2314,7 @@ async def _generate_summary_via_llm(
             "Wynik nie przeszedl quality gate. Popraw JSON tak, aby:\n"
             "- zwracal wylacznie headline, mode, items, sources,\n"
             "- items zawieraly naturalne tytuly i body po 2-3 zdania,\n"
-            "- liczba items pasowala do mode (quick 1-3, standard 3-4, extended 4-5),\n"
+            "- liczba items pasowala do mode (quick 3-6, standard 3-4, extended 4-5),\n"
             "- byl maksymalnie konkretny i bez pustych ogolnikow,\n"
             "- nie zawieral technicznych slow debug/fallback/upstream.\n"
             "Zwroc ponownie tylko JSON."
@@ -2413,28 +2416,15 @@ class BriefService:
         continents: list[str],
         query: str | None,
     ) -> tuple[list[dict[str, Any]], int]:
-        raw_items: list[dict[str, Any]] = []
-        region_codes = [
-            region
-            for continent in continents
-            for region in CONTINENT_TO_AXESSO_REGIONS.get(continent, [])
-        ]
-        semaphore = asyncio.Semaphore(MAX_CONCURRENT_REGION_FETCHES)
-
-        async def fetch_region(region: str) -> list[dict[str, Any]]:
-            async with semaphore:
-                return await self.list_service.fetch_normalized(
-                    s=query,
-                    region=region,
-                    limit=FETCH_LIMIT_PER_REGION,
-                )
-
-        batches = await asyncio.gather(*(fetch_region(region) for region in region_codes))
-        fetched_total = 0
-        for batch in batches:
-            fetched_total += len(batch)
-            raw_items.extend(batch)
-        return _dedupe_items(raw_items), fetched_total
+        # Always fetch from US region — the only one supported by current Axesso plan.
+        # US Yahoo Finance carries global news (Reuters, Bloomberg, AP) covering all regions.
+        # Region-specific filtering is handled downstream by LLM based on user's continent selection.
+        raw_items = await self.list_service.fetch_normalized(
+            s=query,
+            region="US",
+            limit=FETCH_LIMIT_PER_REGION,
+        )
+        return _dedupe_items(raw_items), len(raw_items)
 
     async def run(
         self,
@@ -2465,6 +2455,10 @@ class BriefService:
             geo_focus=geo_focus,
         )
         normalized_query = normalize_query(brief_context.get("main_focus"))
+        # axesso_query is always None: Axesso does not support free-text search via s= parameter
+        # (returns 0 results for any query). Region-only fetches work correctly.
+        # Filtering/selection by user query is handled by LLM downstream.
+        axesso_query: str | None = None
         normalized_geo_focus = normalize_text(geo_focus or "").strip() or None
         if not normalized_geo_focus and not brief_context.get("primary_question") and not brief_context.get("profile_focus"):
             normalized_geo_focus = normalize_text(str(brief_context.get("region_context") or "")).strip() or None
@@ -2512,7 +2506,7 @@ class BriefService:
             try:
                 items, fetched_count = await self._fetch_merged_items(
                     continents=normalized_continents,
-                    query=normalized_query,
+                    query=axesso_query,
                 )
             except (NewsDataParsingError, UpstreamNewsProviderError) as exc:
                 list_fetch_status = "failed"

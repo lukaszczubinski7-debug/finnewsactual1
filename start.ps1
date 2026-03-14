@@ -1,9 +1,10 @@
-$ErrorActionPreference = "Stop"
+$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$backendDir = Join-Path $root "backend"
+$frontendDir = Join-Path $root "frontend"
 
-# 1. Migracja bazy danych (synchronicznie)
-Write-Host ""
+# Migracja DB
 Write-Host ">>> Migracja bazy danych..." -ForegroundColor Cyan
-Push-Location backend
+Push-Location $backendDir
 uv run alembic upgrade head
 if ($LASTEXITCODE -ne 0) {
     Write-Host "BLAD: Migracja nie powiodla sie." -ForegroundColor Red
@@ -13,11 +14,13 @@ if ($LASTEXITCODE -ne 0) {
 Pop-Location
 Write-Host "    OK" -ForegroundColor Green
 
-# 2. Backend + frontend (dev.ps1)
-Write-Host ">>> Uruchamiam backend i frontend..." -ForegroundColor Cyan
-& .\dev.ps1
+Start-Process powershell `
+  -WorkingDirectory $backendDir `
+  -ArgumentList "-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ".\scripts\run_dev.ps1"
+
+Start-Process powershell `
+  -WorkingDirectory $frontendDir `
+  -ArgumentList "-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "npm run dev"
 
 Write-Host ""
-Write-Host "==========================================" -ForegroundColor Yellow
-Write-Host "  Otwierz przegladarke: http://localhost:3000" -ForegroundColor Yellow
-Write-Host "==========================================" -ForegroundColor Yellow
+Write-Host "Frontend: http://localhost:3000" -ForegroundColor Yellow

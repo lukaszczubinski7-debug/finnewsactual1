@@ -138,7 +138,13 @@ export default function Page() {
       setAuthMode("closed");
     } catch (loginError) {
       const apiError = loginError as APIError;
-      setAuthError(apiError.message || "Logowanie nie powiodlo sie.");
+      if (apiError.status === 401) {
+        setAuthError("Nieprawidlowy email lub haslo.");
+      } else if (apiError.status === 0 || apiError.status === 500) {
+        setAuthError("Serwer niedostepny. Sprawdz czy backend jest uruchomiony.");
+      } else {
+        setAuthError(apiError.message || "Logowanie nie powiodlo sie.");
+      }
     } finally {
       setAuthLoading(false);
     }
@@ -157,7 +163,11 @@ export default function Page() {
     } catch (registerError) {
       const apiError = registerError as APIError;
       if (apiError.status === 422) {
-        setAuthError("Podaj poprawny adres email");
+        setAuthError("Podaj poprawny adres email.");
+      } else if (apiError.status === 409) {
+        setAuthError("Konto z tym emailem juz istnieje.");
+      } else if (apiError.status === 0 || apiError.status === 500) {
+        setAuthError("Serwer niedostepny. Sprawdz czy backend jest uruchomiony.");
       } else {
         setAuthError(apiError.message || "Rejestracja nie powiodla sie.");
       }

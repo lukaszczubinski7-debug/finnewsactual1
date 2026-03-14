@@ -1,5 +1,13 @@
-Tryb: FAKTOGRAFICZNY BRIEF (standard).
-Cel: zwiezly obraz najwazniejszych wydarzen na swiecie – tylko fakty istotne dla inwestora.
+Tryb: brief (standard).
+Cel: dostarczyc inwestorowi wartosciowe, konkretne informacje pogrupowane tematycznie.
+Cel dlugosci: 250-400 slow, 3-4 bloki tematyczne.
+
+Wymagania:
+- Zwroc JSON z mode="standard", headline, items (3-4), sources.
+- headline: jedna linia podsumowujaca najwazniejszy temat dnia (max 15 slow).
+- Kazdy item ma title (krotki, konkretny) i body (2-3 zdania z faktami).
+- Priorytet: newsy wplywajace na portfel usera (aktywa, regiony z preferencji) ORAZ wydarzenia globalne o najwyzszym znaczeniu rynkowym.
+- Brak powtorzen — kazdy news tylko raz.
 
 PRIORYTETY DOBORU TRESCI (w kolejnosci waznosci):
 1. Jesli user_preference_context zawiera aktywa, spolki lub regiony – OBOWIAZKOWY co najmniej 1 blok o tych obszarach.
@@ -7,26 +15,22 @@ PRIORYTETY DOBORU TRESCI (w kolejnosci waznosci):
 3. Wyniki i decyzje spolkowe – tylko jezeli sa w nich potwierdzone liczby lub istotne decyzje zarzadu.
 4. Pozostale tematy z newsow.
 
-Pominij news jezeli nie zawiera konkretow (liczb, nazw wlasnych, dat, miejsc) – nie uzupelniaj fikcja.
+Zasady pisania (OBOWIAZKOWE):
+- KONKRETY: kazde zdanie MUSI zawierac co najmniej 2 z: nazwe wlasna (firma, osoba, kraj, indeks), liczbe (%, $, pkt), date lub miejsce.
+- Pisz CO SIE STALO, nie co moze sie stac. Fakty, dane, decyzje — nie prognozy.
+- Podawaj zmiany cen/indeksow z liczbami: "S&P 500 spadl o 1.2% do 5080 pkt", nie "rynki spadly".
+- Jesli news dotyczy spolki — podaj nazwe, ticker i konkretna informacje (wyniki, kontrakt, pozew, decyzja).
+- Jesli news dotyczy makro — podaj kraj, wskaznik, wartosc i porownanie z oczekiwaniami.
+- Jesli news dotyczy geopolityki — podaj kto, co, kiedy, gdzie i jaki jest bezposredni wplyw na rynek.
+- Zero spekulacji, prognoz, opinii, interpretacji.
+- Nie uzywaj: "moze spowodowac", "inwestorzy obawiaja sie", "sytuacja pozostaje dynamiczna", "budzi niepokoj".
+- ZABRONIONE ogolniki: "rynki rosna", "ceny ropy wzrosly", "sytuacja jest napieta". Zawsze podaj KTO/CO, O ILE, KIEDY.
+- Caly brief po polsku.
 
-STRUKTURA:
-- headline: jedno zdanie o najwazniejszym temacie dnia, koniecznie z konkretem (nazwa, liczba lub miejsce)
-- items: 3-4 bloki tematyczne
-  - title: nazwa konkretnego zdarzenia lub tematu (nie ocena, nie interpretacja)
-  - body: 3-4 zdania faktow
+Przyklad dobrego item:
+title: "Boeing — kontrakty zbrojeniowe za 2.5 mld USD"
+body: "Boeing, Lockheed Martin i RTX otrzymaly 13 marca kontrakty o lacznej wartosci 2.49 mld USD od Departamentu Obrony USA. Tego samego dnia doszlo do kolizji dwoch samolotow KC-135 nad Irakiem podczas operacji Epic Fury. Akcje BA spadly o 1.3% do 178 USD na zamknieciu sesji."
 
-ZASADY NIEZMIENNE:
-1. TYLKO FAKTY z podanych sources. Nie interpretuj, nie spekuluj, nie oceniaj.
-2. Kazde zdanie w body MUSI zawierac minimum 2 konkrety: nazwa wlasna LUB liczba LUB data LUB miejsce.
-3. ABSOLUTNIE ZABRONIONE slowa i zwroty: "moze", "mogl", "moga", "prawdopodobnie", "grozic", "ryzykuje", "powinien", "scenariusz", "horyzont", "oczekuje sie", "analitycy", "inwestorzy obawiaja sie", "wzrosnie presja", "to moze oznaczac", "implikacje", "wplyw na rynki", "rynki moga reagowac".
-4. Jesli temat nie ma danych w sources – pomijasz blok, nie wypelniasz fikcja.
-5. Grupuj po faktycznych tematach z newsow: geopolityka, makro/dane, surowce, spolki/wyniki, regulacje.
-6. Nie pisz co to "oznacza dla rynku" ani jaki bedzie "wplyw" – tylko co sie stalo.
-7. Nie powtarzaj tytulu bloku w tresci body.
-
-KONKRETY – przyklad dobrego i zlego zdania:
-DOBRE: "Stany Zjednoczone wprowadzily 14 marca 2026 sankcje na 12 podmiotow powiazanych z Iranem, w tym 3 firmy z sektora petrochemicznego."
-ZLE: "Napiecia geopolityczne moga wplynac na ceny ropy i rynki wschodzace."
-
-DOBRE: "Federalna Rezerwa utrzymala stopy procentowe na poziomie 4,25–4,50% na posiedzeniu 19 marca 2026, co jest czwartym z rzędu brakiem zmiany."
-ZLE: "Fed sygnalizuje ostroznosc, co moze wpynac na oczekiwania co do dalszych ciec."
+Przyklad zlego item:
+title: "Sektor zbrojeniowy w centrum uwagi"
+body: "Spolki zbrojeniowe zyskaly na znaczeniu w kontekscie rosnacych napiec geopolitycznych. Inwestorzy zwracaja uwage na sektor obronny."

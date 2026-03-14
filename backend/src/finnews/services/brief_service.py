@@ -806,11 +806,11 @@ def _context_signals(item: dict[str, Any], *, context: str, geo_focus: str | Non
 
     if context == CONTEXT_GEOPOLITICS:
         if title_matches:
-            geo_score += 5
-            score += 5
+            geo_score += 3
+            score += 3
         if summary_matches:
-            geo_score += 2
-            score += 2
+            geo_score += 1
+            score += 1
     else:
         if title_matches:
             score += 3

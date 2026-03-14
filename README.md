@@ -46,7 +46,7 @@ Debug mode:
 Uruchom projekt lokalnie z katalogu root repo:
 
 ```powershell
-cd backend; uv run alembic upgrade head; cd ..; .\dev.ps1
+cd C:\Users\Administrator\finnewsactual1\backend; uv run alembic upgrade head; cd C:\Users\Administrator\finnewsactual1; .\dev.ps1
 ```
 
 Skrypt `dev.ps1` uruchamia backend i frontend w osobnych oknach PowerShell.

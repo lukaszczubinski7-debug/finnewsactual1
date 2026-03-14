@@ -43,7 +43,8 @@ CONTEXT_POLAND = "Polska / GPW"
 
 DEFAULT_CONTEXT = CONTEXT_GEOPOLITICS
 DEFAULT_CONTINENTS = ["NA"]
-MAX_CONTINENTS_PER_REQUEST = 3
+GEOPOLITICS_EXTRA_CONTINENTS = ["NA", "ME", "EU"]
+MAX_CONTINENTS_PER_REQUEST = 6
 HARD_LIST_LIMIT = 20
 FETCH_LIMIT_PER_REGION = 60
 MAX_ITEMS_FOR_SCORING = 300
@@ -644,11 +645,11 @@ def _freshness_boost(item: dict[str, Any], *, now: datetime | None = None) -> tu
     if age_hours is None:
         return -0.5, "freshness unknown"
     if age_hours < 6:
-        return 3.0, "fresh <6h"
+        return 1.5, "fresh <6h"
     if age_hours < 24:
-        return 2.0, "fresh <24h"
+        return 0.75, "fresh <24h"
     if age_hours < 72:
-        return 1.0, "fresh <72h"
+        return 0.25, "fresh <72h"
     return 0.0, None
 
 
@@ -2474,8 +2475,17 @@ class BriefService:
         selected_count = 0
         list_fetch_status = "ok"
         fetch_error_reason = ""
+
+        # For geopolitical context, always include NA+ME+EU to capture global events.
+        # Without this, users selecting only NA get no Middle East / European war news.
+        if normalized_context == CONTEXT_GEOPOLITICS:
+            extra = [c for c in GEOPOLITICS_EXTRA_CONTINENTS if c not in normalized_continents]
+            fetch_continents = normalized_continents + extra
+        else:
+            fetch_continents = normalized_continents
+
         cache_key = self._cache_key(
-            continents=normalized_continents,
+            continents=fetch_continents,
             window_hours=window_hours,
             geo_focus=normalized_geo_focus,
             custom_query=normalized_query,
@@ -2505,7 +2515,7 @@ class BriefService:
             items: list[dict[str, Any]] = []
             try:
                 items, fetched_count = await self._fetch_merged_items(
-                    continents=normalized_continents,
+                    continents=fetch_continents,
                     query=axesso_query,
                 )
             except (NewsDataParsingError, UpstreamNewsProviderError) as exc:

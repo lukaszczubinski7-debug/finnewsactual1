@@ -42,9 +42,7 @@ Debug mode:
 ## Uruchomienie lokalne
 
 ```powershell
-.\start.ps1
+cd C:\Users\Administrator\finnewsactual1\backend; uv run alembic upgrade head; cd C:\Users\Administrator\finnewsactual1; .\dev.ps1
 ```
 
 Nastepnie otworz: **http://localhost:3000**
-
-Skrypt wykonuje migracje bazy danych, a nastepnie uruchamia backend i frontend w osobnych oknach PowerShell.

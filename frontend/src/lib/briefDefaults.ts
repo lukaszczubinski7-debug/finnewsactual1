@@ -27,6 +27,6 @@ export function createInitialFormState(): BriefRequest {
     window_hours: 72,
     list_limit: HARD_LIST_LIMIT,
     summary_k: DEFAULT_SUMMARY_K,
-    style: "krotko",
+    style: "normalnie",
   };
 }

@@ -8,7 +8,6 @@ import BriefResult from "../components/BriefResult";
 import type { ContinentKey } from "../components/ContinentMap";
 import FooterActions from "../components/FooterActions";
 import HeaderBar from "../components/HeaderBar";
-import VersionSelector from "../components/VersionSelector";
 import styles from "../components/HudBriefForm.module.css";
 import { deleteMe, getMe, getPreferences, login, patchPreferences, postBrief, register } from "../lib/api";
 import { HARD_LIST_LIMIT, createInitialFormState, ensureContinents } from "../lib/briefDefaults";
@@ -63,7 +62,6 @@ function hasUsefulProfile(preference: UserPreference | null): boolean {
 export default function Page() {
   const [selectedRegions, setSelectedRegions] = useState<ContinentKey[]>([]);
   const [mainQuestion, setMainQuestion] = useState("");
-  const [briefMode, setBriefMode] = useState<BriefRequest["style"]>("krotko");
   const [loading, setLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [preferenceLoading, setPreferenceLoading] = useState(false);
@@ -215,7 +213,6 @@ export default function Page() {
   const handleCancel = () => {
     setSelectedRegions([]);
     setMainQuestion("");
-    setBriefMode("krotko");
     setError(null);
     setResult(null);
     setInputValidationMessage(null);
@@ -234,7 +231,7 @@ export default function Page() {
 
     const payload: BriefRequest = {
       ...initialFormState,
-      style: briefMode,
+      style: "normalnie",
       list_limit: HARD_LIST_LIMIT,
       continents: mapRegionsToContinents(selectedRegions),
       geo_focus: "",
@@ -299,7 +296,6 @@ export default function Page() {
             onDeleteAccount={handleDeleteAccount}
             onSavePreferences={handleSavePreferences}
           />
-          <VersionSelector mode={briefMode} onChange={setBriefMode} disabled={loading || authLoading} />
           <AnalysisPanel
             regionOptions={REGION_OPTIONS}
             selectedRegions={selectedRegions}

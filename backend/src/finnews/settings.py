@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # LLM (opcjonalnie)
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
-    llm_top_k: int = Field(default=5, alias="LLM_TOP_K")
+    llm_top_k: int = Field(default=12, alias="LLM_TOP_K")
 
     # App
     app_env: str = Field(default="dev", alias="APP_ENV")

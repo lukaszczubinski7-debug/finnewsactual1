@@ -45,10 +45,10 @@ DEFAULT_CONTEXT = CONTEXT_GEOPOLITICS
 DEFAULT_CONTINENTS = ["NA"]
 GEOPOLITICS_EXTRA_CONTINENTS = ["NA", "ME", "EU"]
 MAX_CONTINENTS_PER_REQUEST = 6
-HARD_LIST_LIMIT = 20
-FETCH_LIMIT_PER_REGION = 60
-MAX_ITEMS_FOR_SCORING = 300
-MAX_CONCURRENT_REGION_FETCHES = 2
+HARD_LIST_LIMIT = 30
+FETCH_LIMIT_PER_REGION = 80
+MAX_ITEMS_FOR_SCORING = 400
+MAX_CONCURRENT_REGION_FETCHES = 3
 CACHE_TTL_SECONDS = 300
 INTERNAL_SELECT_K = settings.llm_top_k
 SELECT_K_MIN = 5
@@ -143,7 +143,7 @@ GENERIC_BLOCK_TITLES = (
 
 CONTINENT_TO_AXESSO_REGIONS: dict[str, list[str]] = {
     "NA": ["US"],
-    "EU": ["GB"],
+    "EU": ["GB", "PL"],
     "AS": ["SG"],
     "ME": ["AE"],
     "SA": ["BR"],
@@ -806,11 +806,11 @@ def _context_signals(item: dict[str, Any], *, context: str, geo_focus: str | Non
 
     if context == CONTEXT_GEOPOLITICS:
         if title_matches:
-            geo_score += 3
-            score += 3
+            geo_score += 5
+            score += 5
         if summary_matches:
-            geo_score += 1
-            score += 1
+            geo_score += 2
+            score += 2
     else:
         if title_matches:
             score += 3

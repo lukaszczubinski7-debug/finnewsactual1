@@ -1,10 +1,10 @@
 import type { BriefRequest, ContinentCode } from "./types";
 
 export const DEFAULT_CONTINENTS: ContinentCode[] = ["NA"];
-export const DEFAULT_SUMMARY_K = 5;
+export const DEFAULT_SUMMARY_K = 8;
 export const SUMMARY_K_MIN = 3;
-export const SUMMARY_K_MAX = 10;
-export const HARD_LIST_LIMIT = 20;
+export const SUMMARY_K_MAX = 12;
+export const HARD_LIST_LIMIT = 30;
 
 export function clampSummaryK(value: number): number {
   const numericValue = Number.isFinite(value) ? Math.trunc(value) : DEFAULT_SUMMARY_K;

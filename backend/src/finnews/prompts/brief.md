@@ -1,5 +1,13 @@
 Tryb: FAKTOGRAFICZNY BRIEF (standard).
-Cel: zwiezly obraz co sie dzieje na swiecie – tylko fakty istotne dla inwestora.
+Cel: zwiezly obraz najwazniejszych wydarzen na swiecie – tylko fakty istotne dla inwestora.
+
+PRIORYTETY DOBORU TRESCI (w kolejnosci waznosci):
+1. Jesli user_preference_context zawiera aktywa, spolki lub regiony – OBOWIAZKOWY co najmniej 1 blok o tych obszarach.
+2. Wydarzenia geopolityczne i makro wysokiego impaktu: decyzje o sankcjach, dzialania militarne, napiecia nuklearne, decyzje bankow centralnych, kluczowe dane makro (CPI, GDP, PMI).
+3. Wyniki i decyzje spolkowe – tylko jezeli sa w nich potwierdzone liczby lub istotne decyzje zarzadu.
+4. Pozostale tematy z newsow.
+
+Pominij news jezeli nie zawiera konkretow (liczb, nazw wlasnych, dat, miejsc) – nie uzupelniaj fikcja.
 
 STRUKTURA:
 - headline: jedno zdanie o najwazniejszym temacie dnia, koniecznie z konkretem (nazwa, liczba lub miejsce)

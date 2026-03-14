@@ -2100,6 +2100,11 @@ def _normalize_unified_summary(
     if not normalize_text(str(enriched.get("headline") or "")).strip():
         enriched["headline"] = "Krotki briefing geopolityczno-rynkowy"
 
+    # If LLM returned items directly (factual brief template), use them in _to_brief_items.
+    raw_items = base.get("items")
+    if isinstance(raw_items, list) and raw_items:
+        enriched["items"] = raw_items
+
     if style == "short":
         quick_user_inputs = [
             normalize_text(query or "").strip(),

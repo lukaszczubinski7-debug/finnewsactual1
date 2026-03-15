@@ -2457,6 +2457,7 @@ class BriefService:
         self.list_service = NewsListService(self.client)
         self.details_service = NewsDetailsService(self.client)
         self.web_search_service = WebSearchService()
+        self.llm_client = LLMClient()
         self._brief_cache: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
 
     def _cache_key(
@@ -2634,6 +2635,15 @@ class BriefService:
         if cached_result is not None:
             return cached_result
 
+        # Extract geo focuses via LLM in parallel with news fetch (adds ~0 latency).
+        # gpt-4.1-nano interprets query + profile → list of concrete geographic/entity terms.
+        geo_focus_task: asyncio.Task[list[str]] = asyncio.create_task(
+            self.llm_client.extract_geo_focuses(
+                query=normalized_query or query,
+                preference_context=normalized_preference_context,
+            )
+        )
+
         try:
             items: list[dict[str, Any]] = []
             try:
@@ -2650,6 +2660,18 @@ class BriefService:
                     request_id or "-",
                     fetch_error_reason,
                 )
+            # Merge LLM-extracted geo focuses into normalized_geo_focus for scoring.
+            try:
+                llm_focuses = await geo_focus_task
+            except Exception as exc:
+                logger.warning("geo_focus_task error: %s", exc)
+                llm_focuses = []
+            if llm_focuses:
+                existing = [normalized_geo_focus] if normalized_geo_focus else []
+                merged = existing + [f for f in llm_focuses if f not in existing]
+                normalized_geo_focus = ", ".join(merged)
+                logger.info("geo_focus llm_extracted=%s final=%r", llm_focuses, normalized_geo_focus)
+
             time_filtered_items = _filter_items_by_window(items, window_hours=window_hours, now=now)
             time_filtered_items = _limit_items_for_scoring(time_filtered_items)
             after_time_filter_count = len(time_filtered_items)

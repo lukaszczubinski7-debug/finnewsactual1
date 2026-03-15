@@ -54,6 +54,49 @@ class LLMClient:
         )
         return uuids[:k]
 
+    async def extract_geo_focuses(
+        self,
+        query: str | None,
+        preference_context: str | None,
+    ) -> list[str]:
+        """Extract geographic/entity focuses from user input.
+
+        Returns a list of concrete terms (countries, cities, companies, topics)
+        that should boost scoring for matching articles.
+        Returns [] when both inputs are empty or on any error.
+
+        Uses gpt-4.1-nano — cheap and fast (~100ms, ~$0.0001/call).
+        """
+        combined = " | ".join(
+            part for part in [query or "", preference_context or ""] if part.strip()
+        )
+        if not combined.strip():
+            return []
+
+        prompt = (
+            "Extract geographic regions, countries, companies, and key financial topics "
+            "from the input. Return ONLY a JSON array of short English strings (max 6 items). "
+            "Examples: [\"Iran\", \"Fed\", \"NVIDIA\", \"Poland\", \"oil\"] "
+            "If nothing specific — return [].\n\nInput: " + combined
+        )
+
+        try:
+            resp = await self.client.chat.completions.create(
+                model="gpt-4.1-nano",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=120,
+            )
+            text = (resp.choices[0].message.content or "").strip()
+            # Strip markdown fences if present
+            text = re.sub(r"^```[a-z]*\n?|```$", "", text).strip()
+            data = json.loads(text)
+            if isinstance(data, list):
+                return [str(x).strip() for x in data if str(x).strip()][:6]
+        except Exception:
+            pass
+        return []
+
     async def complete(self, messages: list[dict[str, str]], temperature: float = 0.2) -> str:
         resp = await self.client.chat.completions.create(
             model=self.model,

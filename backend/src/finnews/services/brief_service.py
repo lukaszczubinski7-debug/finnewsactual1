@@ -44,9 +44,21 @@ CONTEXT_POLAND = "Polska / GPW"
 DEFAULT_CONTEXT = CONTEXT_GEOPOLITICS
 DEFAULT_CONTINENTS = ["NA"]
 GEOPOLITICS_EXTRA_CONTINENTS = ["NA", "ME", "EU"]
-MAX_CONTINENTS_PER_REQUEST = 6
+MAX_CONTINENTS_PER_REQUEST = 7
 HARD_LIST_LIMIT = 30
 FETCH_LIMIT_PER_REGION = 80
+# Per-continent fetch quotas for parallel news collection.
+# NA (US) gets the largest share — Yahoo Finance US carries Reuters/AP/Bloomberg globally.
+# Other regions supplement with local/regional sources.
+REGION_FETCH_QUOTAS: dict[str, int] = {
+    "NA": 30,
+    "EU": 20,
+    "ME": 15,
+    "AS": 15,
+    "SA": 8,
+    "AF": 6,
+    "OC": 6,
+}
 MAX_ITEMS_FOR_SCORING = 400
 MAX_CONCURRENT_REGION_FETCHES = 3
 CACHE_TTL_SECONDS = 300
@@ -2449,15 +2461,30 @@ class BriefService:
         continents: list[str],
         query: str | None,
     ) -> tuple[list[dict[str, Any]], int]:
-        # Always fetch from US region — the only one supported by current Axesso plan.
-        # US Yahoo Finance carries global news (Reuters, Bloomberg, AP) covering all regions.
-        # Region-specific filtering is handled downstream by LLM based on user's continent selection.
-        raw_items = await self.list_service.fetch_normalized(
-            s=query,
-            region="US",
-            limit=FETCH_LIMIT_PER_REGION,
-        )
-        return _dedupe_items(raw_items), len(raw_items)
+        # Fetch from all regions in parallel using per-continent quotas.
+        # NA (US) gets the largest quota as it carries most global financial news (Reuters/AP/Bloomberg).
+        # Other regions add local/regional coverage. Failures are skipped gracefully.
+        tasks: list[tuple[str, asyncio.Task[list[dict[str, Any]]]]] = []
+        for continent, axesso_regions in CONTINENT_TO_AXESSO_REGIONS.items():
+            quota = REGION_FETCH_QUOTAS.get(continent, 10)
+            primary_region = axesso_regions[0]
+            task = asyncio.create_task(
+                self.list_service.fetch_normalized(s=query, region=primary_region, limit=quota)
+            )
+            tasks.append((continent, task))
+
+        results = await asyncio.gather(*[t for _, t in tasks], return_exceptions=True)
+
+        all_items: list[dict[str, Any]] = []
+        total_raw = 0
+        for (continent, _), result in zip(tasks, results):
+            if isinstance(result, Exception):
+                logger.warning("Failed to fetch news for continent %s: %s", continent, result)
+                continue
+            total_raw += len(result)
+            all_items.extend(result)
+
+        return _dedupe_items(all_items), total_raw
 
     async def run(
         self,

@@ -5,45 +5,20 @@ import { useEffect, useMemo, useState } from "react";
 import AnalysisPanel from "../components/AnalysisPanel";
 import AuthProfilePanel from "../components/AuthProfilePanel";
 import BriefResult from "../components/BriefResult";
-import type { ContinentKey } from "../components/ContinentMap";
 import FooterActions from "../components/FooterActions";
 import HeaderBar from "../components/HeaderBar";
 import styles from "../components/HudBriefForm.module.css";
 import { deleteMe, getMe, getPreferences, login, patchPreferences, postBrief, register } from "../lib/api";
-import { HARD_LIST_LIMIT, createInitialFormState, ensureContinents } from "../lib/briefDefaults";
-import type { APIError, AuthUser, BriefRequest, BriefResponse, ContinentCode, UserPreference } from "../lib/types";
+import { HARD_LIST_LIMIT, createInitialFormState } from "../lib/briefDefaults";
+import type { APIError, AuthUser, BriefRequest, BriefResponse, UserPreference } from "../lib/types";
 
-const REGION_OPTIONS: Array<{ key: ContinentKey; label: string }> = [
-  { key: "AMERYKA_PN", label: "Ameryka Polnocna" },
-  { key: "AMERYKA_PD", label: "Ameryka Poludniowa" },
-  { key: "EUROPA", label: "Europa" },
-  { key: "AFRYKA", label: "Afryka" },
-  { key: "BLISKI_WSCHOD", label: "Bliski Wschod" },
-  { key: "AZJA", label: "Azja" },
-  { key: "AUSTRALIA", label: "Australia" },
-];
-const DEFAULT_SELECTED_REGIONS: ContinentKey[] = REGION_OPTIONS.map((option) => option.key);
-
-const REGION_TO_CONTINENTS: Record<ContinentKey, ContinentCode[]> = {
-  AMERYKA_PN: ["NA"],
-  AMERYKA_PD: ["SA"],
-  EUROPA: ["EU"],
-  AFRYKA: ["AF"],
-  BLISKI_WSCHOD: ["ME"],
-  AZJA: ["AS"],
-  AUSTRALIA: ["OC"],
-};
+const ALL_CONTINENTS = ["NA", "EU", "AS", "ME", "SA", "AF", "OC"] as const;
 
 const initialFormState: BriefRequest = createInitialFormState();
 const AUTH_TOKEN_KEY = "finnews_access_token";
 type AuthMode = "closed" | "login" | "register" | "profile";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const EMPTY_INPUT_VALIDATION_MESSAGE = "Wpisz pytanie, wybierz region lub uzupelnij profil uzytkownika.";
-
-function mapRegionsToContinents(regions: ContinentKey[]): ContinentCode[] {
-  const mapped = regions.flatMap((region) => REGION_TO_CONTINENTS[region] || []);
-  return ensureContinents(mapped);
-}
+const EMPTY_INPUT_VALIDATION_MESSAGE = "Wpisz pytanie lub uzupelnij profil uzytkownika.";
 
 function hasUsefulProfile(preference: UserPreference | null): boolean {
   if (!preference) {
@@ -60,7 +35,6 @@ function hasUsefulProfile(preference: UserPreference | null): boolean {
 }
 
 export default function Page() {
-  const [selectedRegions, setSelectedRegions] = useState<ContinentKey[]>([]);
   const [mainQuestion, setMainQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
@@ -75,22 +49,14 @@ export default function Page() {
   const [inputValidationMessage, setInputValidationMessage] = useState<string | null>(null);
 
   const hasQuestion = useMemo(() => mainQuestion.trim().length > 0, [mainQuestion]);
-  const hasRegions = useMemo(() => selectedRegions.length > 0, [selectedRegions]);
   const hasProfile = useMemo(() => hasUsefulProfile(preferences), [preferences]);
-  const canGenerate = hasQuestion || hasProfile || hasRegions;
+  const canGenerate = hasQuestion || hasProfile;
 
   useEffect(() => {
     if (canGenerate) {
       setInputValidationMessage(null);
     }
   }, [canGenerate]);
-
-  const toggleRegion = (region: ContinentKey) => {
-    setInputValidationMessage(null);
-    setSelectedRegions((current) =>
-      current.includes(region) ? current.filter((item) => item !== region) : [...current, region],
-    );
-  };
 
   useEffect(() => {
     const savedToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
@@ -221,7 +187,6 @@ export default function Page() {
   };
 
   const handleCancel = () => {
-    setSelectedRegions([]);
     setMainQuestion("");
     setError(null);
     setResult(null);
@@ -243,7 +208,7 @@ export default function Page() {
       ...initialFormState,
       style: "normalnie",
       list_limit: HARD_LIST_LIMIT,
-      continents: mapRegionsToContinents(selectedRegions),
+      continents: [...ALL_CONTINENTS],
       geo_focus: "",
       query: mainQuestion.trim(),
     };
@@ -307,14 +272,9 @@ export default function Page() {
             onSavePreferences={handleSavePreferences}
           />
           <AnalysisPanel
-            regionOptions={REGION_OPTIONS}
-            selectedRegions={selectedRegions}
             mainQuestion={mainQuestion}
             disabled={loading}
             validationMessage={inputValidationMessage}
-            onToggleRegion={toggleRegion}
-            onSelectAll={() => setSelectedRegions(DEFAULT_SELECTED_REGIONS)}
-            onClearAll={() => setSelectedRegions([])}
             onMainQuestionChange={(value) => {
               setInputValidationMessage(null);
               setMainQuestion(value);

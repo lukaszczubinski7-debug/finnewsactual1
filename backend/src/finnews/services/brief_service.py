@@ -65,7 +65,9 @@ PROMPT_LONG = "extended.md"
 PROMPT_SYSTEM = "system.md"
 PROMPT_SCHEMA = "json_schema.md"
 PROMPT_FALLBACK = "fallback.md"
+PROMPT_CRITIC = "critic.md"
 QUALITY_SCORE_THRESHOLD = 75
+MAX_CRITIC_LOOPS = 2
 DEBUG_WORDING_BLOCKLIST = (
     "fallback",
     "upstream",
@@ -77,6 +79,15 @@ DEBUG_WORDING_BLOCKLIST = (
 EMPTY_GENERALITIES = (
     "sytuacja pozostaje dynamiczna",
     "nalezy obserwowac rozwoj sytuacji",
+    "ocena skupia sie na najbardziej prawdopodobnych implikacjach rynkowych",
+    "scenariusz bazowy:",
+    "pewnosc oceny:",
+    "ryzyko w gore:",
+    "ryzyko w dol:",
+    "fokus analizy:",
+    "skala reakcji aktywow zalezy od tego",
+    "skala reakcji zalezy od potwierdzenia",
+    "kluczowe dla inwestorow pozostaje tempo potwierdzania informacji",
 )
 QUICK_META_PHRASES = (
     "na podstawie dostepnych informacji",
@@ -1862,7 +1873,8 @@ def _build_quick_summary(
 
 def _to_brief_items(summary: dict[str, Any], *, style: str, framing: str) -> list[dict[str, str]]:
     min_items, max_items = _item_bounds_for_style(style)
-    incoming = summary.get("items") if isinstance(summary.get("items"), list) else summary.get("blocks")
+    has_items_key = isinstance(summary.get("items"), list)
+    incoming = summary.get("items") if has_items_key else summary.get("blocks")
     if isinstance(incoming, list):
         items: list[dict[str, str]] = []
         for idx, item in enumerate(incoming[:max_items]):
@@ -1872,6 +1884,10 @@ def _to_brief_items(summary: dict[str, Any], *, style: str, framing: str) -> lis
             body = _compress_to_paragraph(str(item.get("body") or ""), min_sentences=2, max_sentences=3)
             if body:
                 items.append({"title": title, "body": body})
+        # If LLM returned new-format items key, never fall through to old-format fallback
+        # (which fills bodies with placeholder text). Return whatever we have (including empty).
+        if has_items_key:
+            return items[:max_items]
         if len(items) >= min_items:
             return items[:max_items]
 
@@ -2105,8 +2121,10 @@ def _normalize_unified_summary(
         enriched["headline"] = "Krotki briefing geopolityczno-rynkowy"
 
     # If LLM returned items directly (factual brief template), use them in _to_brief_items.
+    # Treat both populated and empty lists as "LLM used new-format" to avoid falling through
+    # to the old-format fallback path that fills item bodies with dummy placeholder text.
     raw_items = base.get("items")
-    if isinstance(raw_items, list) and raw_items:
+    if isinstance(raw_items, list):
         enriched["items"] = raw_items
 
     if style == "short":
@@ -2129,13 +2147,12 @@ def _normalize_unified_summary(
 
     items = _to_brief_items(enriched, style=style, framing=framing)
     if len(items) < 1:
-        while len(items) < 1:
-            items.append(
-                {
-                    "title": "Rynek pozostaje czuly na tempo naplywu nowych informacji",
-                    "body": "Wyceny aktywow zaleza od tego, czy kolejne doniesienia potwierdza konkretne kanaly ryzyka dla energii, FX i sentymentu. Najbardziej prawdopodobny jest scenariusz podwyzszonej zmiennosci do czasu silniejszych sygnalow kierunkowych.",
-                }
-            )
+        items.append(
+            {
+                "title": "Brak danych spelniajacych kryteria jakosciowe",
+                "body": "Dostepne zrodla nie zawieraly informacji z wystarczajaca liczba konkretow (nazwa wlasna, liczba, data, miejsce). Brief nie zostal wygenerowany.",
+            }
+        )
     _, max_items = _item_bounds_for_style(style)
     return {
         "headline": _non_empty_text(enriched.get("headline"), "Krotki briefing geopolityczno-rynkowy"),
@@ -2177,44 +2194,83 @@ def _build_fallback_summary(
     reason: str,
 ) -> dict[str, Any]:
     _ = reason
-    fallback_hint = _load_prompt(PROMPT_FALLBACK).splitlines()[0]
-    focus = geo_focus or "szeroki fokus geopolityczny"
-    question = query or "brak dodatkowego pytania"
-    regions = ", ".join(continents) if continents else "NA"
+    regions = ", ".join(continents) if continents else "wybranych regionach"
+    focus_label = geo_focus or regions
     return {
-        "headline": "Brief geopolityczno-rynkowy",
-        "thesis": f"Temat {focus} pozostaje istotnym czynnikiem wyceny aktywow wrazliwych na ryzyko geopolityczne.",
-        "facts": [
-            f"W centrum uwagi pozostaje {focus}.",
-            f"Horyzont decyzyjny dla rynku: {window_hours}h.",
-            f"Pytanie inwestycyjne: {question}.",
-            f"Najwazniejsze regiony odniesienia: {regions}.",
+        "headline": f"Brak istotnych zdarzen z konkretami w ostatnich {window_hours}h",
+        "mode": _mode_from_style(style),
+        "items": [
+            {
+                "title": "Brak danych spelniajacych kryteria istotnosci",
+                "body": (
+                    f"Zrodla wiadomosci z ostatnich {window_hours} godzin nie zawieraly wydarzen "
+                    f"z wystarczajaca liczba konkretow (nazwy wlasne, liczby, daty, miejsca) "
+                    f"dla regionow: {focus_label}. "
+                    f"Brief nie zostal wygenerowany z powodu braku kwalifikujacych sie informacji."
+                ),
+            }
         ],
-        "analysis": f"{fallback_hint} Najbardziej wrazliwe pozostaja energia, FX i aktywa ryzykowne, a kierunek ruchu wyznacza tempo pojawiania sie nowych sygnalow.",
-        "confidence": {
-            "level": "medium",
-            "reason": "Pewnosc umiarkowana, bo rynek reaguje glownie na kolejne potwierdzenia i skale potencjalnej eskalacji.",
-        },
-        "scenarios": {
-            "base": "Umiarkowana zmiennosc i selektywny risk premium do czasu nowych potwierdzonych informacji.",
-            "upside_risk": "Eskalacja podbija cene energii, umacnia bezpieczne przystanie i zwieksza awersje do ryzyka.",
-            "downside_risk": "Deeskalacja zmniejsza premie geopolityczne i stabilizuje wyceny ryzykownych aktywow.",
-        },
-        "market_impact": [
-            {"asset": "Ropa i gaz", "direction": "mixed", "why": "Wysoka wrazliwosc na sygnaly o eskalacji i logistycznych zakloceniach."},
-            {"asset": "FX (USD i waluty EM)", "direction": "mixed", "why": "Przeplywy risk-on/risk-off moga szybko zmieniac kierunek notowan."},
-            {"asset": "Indeksy akcji", "direction": "unclear", "why": "Reakcja zalezy od nowych potwierdzonych impulsow geopolitycznych."},
-        ],
-        "watchlist": [
-            "Oficjalne komunikaty rzadowe i regulatorow z kluczowych regionow.",
-            "Szybkie zmiany na ropie, gazie i glownych parach FX.",
-            "Informacje o sankcjach, logistyce i bezpieczenstwie szlakow transportowych.",
-            "Ton komunikacji bankow centralnych wobec ryzyk inflacyjnych i wzrostowych.",
-            "Potwierdzenia lub odwolania sygnalow eskalacyjnych przez wiarygodne zrodla.",
-        ],
-        "geopolitical_context": f"Kontekst obejmuje {focus} oraz jego potencjalny wplyw na energie, FX i sentyment globalny.",
         "sources": [],
     }
+
+
+async def _critic_review(
+    brief: dict[str, Any],
+    *,
+    style: str,
+) -> tuple[bool, list[str]]:
+    """LLM krytyk sprawdza brief pod katem zasad konstrukcyjnych.
+    Zwraca (is_valid, lista_problemow)."""
+    llm = LLMClient()
+    critic_system = _load_prompt(PROMPT_CRITIC)
+    payload = {
+        "brief": brief,
+        "style": style,
+    }
+    messages = [
+        {"role": "system", "content": critic_system},
+        {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+    ]
+    raw = await llm.complete(messages, temperature=0.0)
+    try:
+        result = json.loads(raw)
+        valid = bool(result.get("valid", True))
+        issues = [str(issue) for issue in result.get("issues", []) if issue]
+        logger.debug("Critic review: valid=%s, issues=%d", valid, len(issues))
+        return valid, issues
+    except Exception:
+        logger.warning("Critic LLM returned unparseable JSON — skipping correction")
+        return True, []
+
+
+async def _fix_with_critic_feedback(
+    brief: dict[str, Any],
+    issues: list[str],
+    *,
+    base_messages: list[dict[str, str]],
+) -> dict[str, Any]:
+    """LLM fixer poprawia brief na podstawie listy problemow od krytyka.
+    Zwraca poprawiony dict lub oryginalny brief przy bledzie parsowania."""
+    llm = LLMClient()
+    issues_text = "\n".join(f"- {issue}" for issue in issues)
+    fix_instruction = (
+        f"Krytyk wykryl nastepujace problemy w breifie:\n{issues_text}\n\n"
+        "Popraw brief eliminujac WSZYSTKIE wymienione problemy.\n"
+        "Zachowaj te same zrodla i fakty — nie dodawaj ani nie zmyslaj nowych informacji.\n"
+        "Zwroc wylacznie poprawiony JSON, bez markdown."
+    )
+    fix_messages = base_messages + [
+        {"role": "assistant", "content": json.dumps(brief, ensure_ascii=False)},
+        {"role": "user", "content": fix_instruction},
+    ]
+    raw = await llm.complete(fix_messages, temperature=0.0)
+    try:
+        fixed = json.loads(raw)
+        logger.debug("Fixer LLM returned corrected brief")
+        return fixed
+    except Exception:
+        logger.warning("Fixer LLM returned unparseable JSON — keeping previous brief")
+        return brief
 
 
 async def _generate_summary_via_llm(
@@ -2288,74 +2344,50 @@ async def _generate_summary_via_llm(
         normalize_text(preference_context or "").strip(),
         _derived_focus_from_regions(continents),
     ]
-    quick_valid = True
+    # Petla krytyk/fixer: LLM krytyk sprawdza brief, LLM fixer poprawia na podstawie wytkniectych problemow.
+    for attempt in range(MAX_CRITIC_LOOPS):
+        is_valid, issues = await _critic_review(normalized, style=style)
+        if is_valid or not issues:
+            logger.debug("Critic approved brief on attempt %d", attempt + 1)
+            break
+        logger.info(
+            "Critic rejected brief (attempt %d/%d), %d issue(s): %s",
+            attempt + 1,
+            MAX_CRITIC_LOOPS,
+            len(issues),
+            issues,
+        )
+        fixed_raw = await _fix_with_critic_feedback(normalized, issues, base_messages=base_messages)
+        normalized = _normalize_unified_summary(
+            fixed_raw,
+            fallback_message="Ocena skupia sie na najbardziej prawdopodobnych implikacjach rynkowych.",
+            style=style,
+            geo_focus=geo_focus,
+            continents=continents,
+            query=query,
+            preference_context=preference_context,
+        )
+
+    # Fallback dla trybu quick: jesli po petli summary nadal nie przechodzi walidacji,
+    # generujemy deterministyczne podsumowanie z tytulów zrodel.
     if style == "short":
         quick_valid = _validate_quick_summary(
             str(normalized.get("summary") or ""),
             sources=quick_sources,
             user_inputs=quick_user_inputs,
         )
-    quality_score = score_brief_quality(normalized, preference_context=preference_context)
-    if quality_score >= QUALITY_SCORE_THRESHOLD and quick_valid:
-        return normalized
+        if not quick_valid:
+            normalized = {
+                "mode": "quick",
+                "summary": _build_quick_summary(
+                    base=normalized if isinstance(normalized, dict) else {},
+                    sources=quick_sources,
+                    preference_context=preference_context,
+                    user_inputs=quick_user_inputs,
+                ),
+            }
 
-    if style == "short":
-        improve_instruction = (
-            "Wynik nie przeszedl quality gate. Popraw JSON tak, aby:\n"
-            "- zwracal tylko mode=quick oraz summary,\n"
-            "- summary bylo jednym akapitem 3-6 zdan (kazde zdanie = jeden osobny fakt),\n"
-            "- kazde zdanie opisywalo konkretny fakt: kto, co, gdzie, kiedy,\n"
-            "- bez prognoz, bez opinii, bez interpretacji, bez konkluzji i bez zaleznosci przyczynowo-skutkowych,\n"
-            "- nie zawieralo fraz meta: Pytanie inwestycyjne, W centrum uwagi, Horyzont decyzyjny, Zakres analizy, Profil, Wybrane regiony, Brief, Fokus geopolityczny,\n"
-            "- nie zawieralo list, sekcji, bulletow, meta-komentarzy i technicznych slow debug/fallback/upstream.\n"
-            "Zwroc ponownie tylko JSON."
-        )
-    else:
-        improve_instruction = (
-            "Wynik nie przeszedl quality gate. Popraw JSON tak, aby:\n"
-            "- zwracal wylacznie headline, mode, items, sources,\n"
-            "- items zawieraly naturalne tytuly i body po 2-3 zdania,\n"
-            "- liczba items pasowala do mode (quick 3-6, standard 3-4, extended 4-5),\n"
-            "- byl maksymalnie konkretny i bez pustych ogolnikow,\n"
-            "- nie zawieral technicznych slow debug/fallback/upstream.\n"
-            "Zwroc ponownie tylko JSON."
-        )
-
-    improve_messages = base_messages + [
-        {"role": "assistant", "content": json.dumps(normalized, ensure_ascii=False)},
-        {"role": "user", "content": improve_instruction},
-    ]
-    improved = await llm.complete(improve_messages, temperature=0.0)
-    try:
-        improved_parsed = json.loads(improved)
-    except Exception:
-        return normalized
-    improved_normalized = _normalize_unified_summary(
-        improved_parsed,
-        fallback_message="Ocena skupia sie na najbardziej prawdopodobnych implikacjach rynkowych.",
-        style=style,
-        geo_focus=geo_focus,
-        continents=continents,
-        query=query,
-        preference_context=preference_context,
-    )
-    if style == "short":
-        if _validate_quick_summary(
-            str(improved_normalized.get("summary") or ""),
-            sources=quick_sources,
-            user_inputs=quick_user_inputs,
-        ):
-            return improved_normalized
-        return {
-            "mode": "quick",
-            "summary": _build_quick_summary(
-                base=improved_parsed if isinstance(improved_parsed, dict) else {},
-                sources=quick_sources,
-                preference_context=preference_context,
-                user_inputs=quick_user_inputs,
-            ),
-        }
-    return improved_normalized
+    return normalized
 
 
 class BriefService:

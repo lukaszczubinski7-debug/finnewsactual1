@@ -2722,7 +2722,13 @@ class BriefService:
                     summary_entries = filtered_summary_entries
 
             picked = [entry["item"] for entry in selected_entries]
-            detail_ids = [str(entry["item"]["id"]) for entry in summary_entries if entry["item"].get("id")]
+            # Only fetch Axesso details for native Axesso items — Serper/web items already
+            # have scraped text in summary and their IDs are MD5 hashes Axesso won't recognise.
+            detail_ids = [
+                str(entry["item"]["id"])
+                for entry in summary_entries
+                if entry["item"].get("id") and entry["item"].get("_source") != "serper"
+            ]
             details_by_id: dict[str, dict[str, Any]] = {}
             if detail_ids:
                 details = await self.details_service.fetch_normalized_many(detail_ids)

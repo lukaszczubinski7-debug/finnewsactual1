@@ -25,7 +25,7 @@ ZASADY DLA mode=standard oraz mode=extended:
 7. ZABRONIONE slowa w body: "moze", "moga", "mogl", "prawdopodobnie", "grozic", "oczekuje sie", "analitycy", "inwestorzy obawiaja sie", "wzrosnie presja", "to moze oznaczac", "implikacje", "wplyw na rynki", "rynki moga reagowac", "budzi obawy", "pozostaje napieta", "moze spowodowac".
 8. ZABRONIONE puste ogolniki: "sytuacja pozostaje dynamiczna", "nalezy obserwowac", "rynki reaguja".
 9. ZABRONIONE frazy szablonowe (wskazuja na brak realnych danych): "Ocena skupia sie na najbardziej prawdopodobnych implikacjach rynkowych", "Scenariusz bazowy:", "Pewnosc oceny:", "Ryzyko w gore:", "Ryzyko w dol:", "Fokus analizy:", "Skala reakcji aktywow zalezy od tego", "Skala reakcji zalezy od potwierdzenia kolejnych informacji", "Kluczowe dla inwestorow pozostaje tempo potwierdzania informacji", "Jesli impuls geopolityczny utrzyma presje".
-9. Zabronione pola na gornym poziomie: thesis, facts, analysis, confidence, scenarios, market_impact, watchlist, geopolitical_context.
+10. Zabronione pola na gornym poziomie: thesis, facts, analysis, confidence, scenarios, market_impact, watchlist, geopolitical_context.
 
 ---
 

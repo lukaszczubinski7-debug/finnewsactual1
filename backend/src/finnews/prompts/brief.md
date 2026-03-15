@@ -16,9 +16,9 @@ Pominij news jezeli nie zawiera konkretow (liczb, nazw wlasnych, dat, miejsc).
 
 STRUKTURA:
 - headline: jedno zdanie z konkretem (nazwa, liczba, miejsce) o najwazniejszym wydarzeniu dnia
-- items: 5-7 blokow tematycznych, posortowanych od najwazniejszego do najmniej waznego
+- items: 3-4 bloki tematyczne, posortowane od najwazniejszego do najmniej waznego
   - title: konkretna nazwa zdarzenia (co sie stalo, nie ocena)
-  - body: 3-5 zdan faktow; dla rozleglego tematu (konflikt, duza regulacja) uzyj pelnych 5 zdan
+  - body: 2-3 zdania faktow; kazde zdanie musi zawierac minimum 2 konkrety (nazwa wlasna, liczba, data, miejsce)
 
 ZASADY NIEZMIENNE:
 1. TYLKO FAKTY z podanych sources. Nie interpretuj, nie spekuluj, nie oceniaj.

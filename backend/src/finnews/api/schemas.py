@@ -97,3 +97,31 @@ class BriefResponse(BaseModel):
     focus: BriefFocus
     summary: dict[str, Any] = Field(default_factory=dict)
     sources: list[BriefSource] = Field(default_factory=list)
+
+
+class ThreadCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=500)
+    assets: str | None = Field(default=None, max_length=500)
+    horizon_days: Literal[7, 30, 90] = 30
+    extra_context: str | None = None
+
+
+class ThreadResponse(BaseModel):
+    id: int
+    name: str
+    assets: str | None
+    horizon_days: int
+    extra_context: str | None
+    status: str
+    new_events_count: int
+    context_snapshot: dict[str, Any] | None
+    created_at: str
+    last_refreshed_at: str | None
+
+
+class ThreadSuggestionResponse(BaseModel):
+    suggest: bool
+    name: str | None = None
+    assets: str | None = None
+    horizon_days: int | None = None
+    reason: str | None = None

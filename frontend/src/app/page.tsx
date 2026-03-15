@@ -7,10 +7,20 @@ import AuthProfilePanel from "../components/AuthProfilePanel";
 import BriefResult from "../components/BriefResult";
 import FooterActions from "../components/FooterActions";
 import HeaderBar from "../components/HeaderBar";
+import ThreadDetail from "../components/ThreadDetail";
+import ThreadsPanel from "../components/ThreadsPanel";
+import ThreadSuggestionBanner from "../components/ThreadSuggestion";
 import styles from "../components/HudBriefForm.module.css";
-import { deleteMe, getMe, getPreferences, login, patchPreferences, postBrief, register } from "../lib/api";
+import {
+  createThread, deleteMe, deleteThread, getMe, getPreferences, getThreads,
+  login, patchPreferences, postBrief, refreshAllThreads, refreshThread,
+  register, suggestThread,
+} from "../lib/api";
 import { HARD_LIST_LIMIT, createInitialFormState } from "../lib/briefDefaults";
-import type { APIError, AuthUser, BriefRequest, BriefResponse, UserPreference } from "../lib/types";
+import type {
+  APIError, AuthUser, BriefRequest, BriefResponse, Thread,
+  ThreadCreateRequest, ThreadSuggestion, UserPreference,
+} from "../lib/types";
 
 const ALL_CONTINENTS = ["NA", "EU", "AS", "ME", "SA", "AF", "OC"] as const;
 
@@ -48,6 +58,16 @@ export default function Page() {
   const [preferences, setPreferences] = useState<UserPreference | null>(null);
   const [inputValidationMessage, setInputValidationMessage] = useState<string | null>(null);
 
+  // Thread Memory state
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
+  const [threadSuggestion, setThreadSuggestion] = useState<ThreadSuggestion | null>(null);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [threadCreating, setThreadCreating] = useState(false);
+  const [threadRefreshingId, setThreadRefreshingId] = useState<number | null>(null);
+  const [threadRefreshingAll, setThreadRefreshingAll] = useState(false);
+  const [threadError, setThreadError] = useState<string | null>(null);
+
   const hasQuestion = useMemo(() => mainQuestion.trim().length > 0, [mainQuestion]);
   const hasProfile = useMemo(() => hasUsefulProfile(preferences), [preferences]);
   const canGenerate = hasQuestion || hasProfile;
@@ -77,6 +97,20 @@ export default function Page() {
       })
       .finally(() => setAuthLoading(false));
   }, []);
+
+  // Load threads when user logs in
+  useEffect(() => {
+    if (!token || !user) {
+      setThreads([]);
+      setSelectedThread(null);
+      return;
+    }
+    setThreadLoading(true);
+    void getThreads(token)
+      .then((data) => setThreads(data))
+      .catch(() => setThreadError("Nie udalo sie pobrac watkow."))
+      .finally(() => setThreadLoading(false));
+  }, [token, user]);
 
   const loadPreferences = async (activeToken: string) => {
     setPreferenceLoading(true);
@@ -191,6 +225,7 @@ export default function Page() {
     setError(null);
     setResult(null);
     setInputValidationMessage(null);
+    setThreadSuggestion(null);
   };
 
   const handleSubmit = async () => {
@@ -203,6 +238,7 @@ export default function Page() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setThreadSuggestion(null);
 
     const payload: BriefRequest = {
       ...initialFormState,
@@ -216,6 +252,16 @@ export default function Page() {
     try {
       const response = await postBrief(payload, token || undefined);
       setResult(response);
+      // After brief — ask AI if it suggests a thread (only if logged in)
+      if (token) {
+        void suggestThread(token, response).then((suggestion) => {
+          if (suggestion?.suggest) {
+            setThreadSuggestion(suggestion);
+          }
+        }).catch(() => {
+          // suggestion is optional, ignore errors
+        });
+      }
     } catch (submitError) {
       const apiError = submitError as APIError;
       setError({
@@ -225,6 +271,78 @@ export default function Page() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Thread handlers
+  const handleCreateThread = async (req: ThreadCreateRequest) => {
+    if (!token) return;
+    setThreadCreating(true);
+    setThreadError(null);
+    setThreadSuggestion(null);
+    try {
+      const newThread = await createThread(token, req);
+      setThreads((prev) => [newThread, ...prev]);
+      setSelectedThread(newThread);
+    } catch (err) {
+      const apiError = err as APIError;
+      setThreadError(apiError.message || "Nie udalo sie utworzyc watku.");
+    } finally {
+      setThreadCreating(false);
+    }
+  };
+
+  const handleRefreshThread = async (threadId: number) => {
+    if (!token) return;
+    setThreadRefreshingId(threadId);
+    setThreadError(null);
+    try {
+      const updated = await refreshThread(token, threadId);
+      setThreads((prev) => prev.map((t) => (t.id === threadId ? updated : t)));
+      if (selectedThread?.id === threadId) {
+        setSelectedThread(updated);
+      }
+    } catch (err) {
+      const apiError = err as APIError;
+      setThreadError(apiError.message || "Nie udalo sie odswiezych watku.");
+    } finally {
+      setThreadRefreshingId(null);
+    }
+  };
+
+  const handleRefreshAll = async () => {
+    if (!token) return;
+    setThreadRefreshingAll(true);
+    setThreadError(null);
+    try {
+      await refreshAllThreads(token);
+      // Reload threads list after refresh-all
+      const updated = await getThreads(token);
+      setThreads(updated);
+      if (selectedThread) {
+        const updatedSelected = updated.find((t) => t.id === selectedThread.id);
+        if (updatedSelected) setSelectedThread(updatedSelected);
+      }
+    } catch (err) {
+      const apiError = err as APIError;
+      setThreadError(apiError.message || "Nie udalo sie odswiezych watkow.");
+    } finally {
+      setThreadRefreshingAll(false);
+    }
+  };
+
+  const handleDeleteThread = async (threadId: number) => {
+    if (!token) return;
+    setThreadError(null);
+    try {
+      await deleteThread(token, threadId);
+      setThreads((prev) => prev.filter((t) => t.id !== threadId));
+      if (selectedThread?.id === threadId) {
+        setSelectedThread(null);
+      }
+    } catch (err) {
+      const apiError = err as APIError;
+      setThreadError(apiError.message || "Nie udalo sie usunac watku.");
     }
   };
 
@@ -315,6 +433,39 @@ export default function Page() {
         ) : null}
 
         {result ? <BriefResult result={result} /> : null}
+
+        {threadSuggestion && token ? (
+          <ThreadSuggestionBanner
+            suggestion={threadSuggestion}
+            onCreate={handleCreateThread}
+            onDismiss={() => setThreadSuggestion(null)}
+          />
+        ) : null}
+
+        {user && token ? (
+          <>
+            <ThreadsPanel
+              threads={threads}
+              loading={threadLoading}
+              creating={threadCreating}
+              refreshingAll={threadRefreshingAll}
+              refreshingId={threadRefreshingId}
+              error={threadError}
+              onSelect={(thread) => setSelectedThread(thread)}
+              onCreate={handleCreateThread}
+              onRefresh={handleRefreshThread}
+              onRefreshAll={handleRefreshAll}
+              onDelete={handleDeleteThread}
+            />
+
+            {selectedThread ? (
+              <ThreadDetail
+                thread={selectedThread}
+                onClose={() => setSelectedThread(null)}
+              />
+            ) : null}
+          </>
+        ) : null}
       </div>
     </main>
   );

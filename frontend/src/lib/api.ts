@@ -7,6 +7,9 @@ import type {
   LoginRequest,
   LoginResponse,
   RegisterRequest,
+  Thread,
+  ThreadCreateRequest,
+  ThreadSuggestion,
   UserPreference,
   UserPreferenceUpdate,
 } from "./types";
@@ -16,6 +19,7 @@ const AUTH_REGISTER_ENDPOINT = "/api/auth/register";
 const AUTH_LOGIN_ENDPOINT = "/api/auth/login";
 const AUTH_ME_ENDPOINT = "/api/auth/me";
 const PROFILE_PREFERENCES_ENDPOINT = "/api/profile/preferences";
+const THREADS_ENDPOINT = "/api/threads";
 
 function parseTickers(tickers: string): string[] {
   return tickers
@@ -236,4 +240,68 @@ export async function patchPreferences(token: string, payload: UserPreferenceUpd
     throw parseApiError(responsePayload, response.status);
   }
   return responsePayload as UserPreference;
+}
+
+export async function getThreads(token: string): Promise<Thread[]> {
+  const response = await fetch(THREADS_ENDPOINT, {
+    method: "GET",
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+  const payload = await parseJsonSafe(response);
+  if (!response.ok) throw parseApiError(payload, response.status);
+  return (payload as Thread[]) ?? [];
+}
+
+export async function createThread(token: string, req: ThreadCreateRequest): Promise<Thread> {
+  const response = await fetch(THREADS_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8", ...authHeaders(token) },
+    body: JSON.stringify(req),
+  });
+  const payload = await parseJsonSafe(response);
+  if (!response.ok) throw parseApiError(payload, response.status);
+  return payload as Thread;
+}
+
+export async function refreshThread(token: string, threadId: number): Promise<Thread> {
+  const response = await fetch(`${THREADS_ENDPOINT}/${threadId}/refresh`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+  const payload = await parseJsonSafe(response);
+  if (!response.ok) throw parseApiError(payload, response.status);
+  return payload as Thread;
+}
+
+export async function refreshAllThreads(token: string): Promise<{ refreshed: number }> {
+  const response = await fetch(`${THREADS_ENDPOINT}/refresh-all`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+  const payload = await parseJsonSafe(response);
+  if (!response.ok) throw parseApiError(payload, response.status);
+  return payload as { refreshed: number };
+}
+
+export async function deleteThread(token: string, threadId: number): Promise<void> {
+  const response = await fetch(`${THREADS_ENDPOINT}/${threadId}`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  if (!response.ok) {
+    const payload = await parseJsonSafe(response);
+    throw parseApiError(payload, response.status);
+  }
+}
+
+export async function suggestThread(token: string, brief: BriefResponse): Promise<ThreadSuggestion> {
+  const response = await fetch(`${THREADS_ENDPOINT}/suggest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8", ...authHeaders(token) },
+    body: JSON.stringify(brief),
+  });
+  const payload = await parseJsonSafe(response);
+  if (!response.ok) throw parseApiError(payload, response.status);
+  return payload as ThreadSuggestion;
 }

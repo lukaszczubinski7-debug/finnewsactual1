@@ -14,28 +14,13 @@ You can also copy the template from `.env.example`.
 
 The frontend uses a Next.js rewrite from `/api/:path*` to `${NEXT_PUBLIC_API_BASE_URL}/:path*`, so the browser sends requests to `/api/brief` and does not require CORS configuration in local development.
 
-## Run in two PowerShell windows
-
-Backend window:
+## Uruchomienie
 
 ```powershell
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+cd C:\Users\Administrator\finnewsactual1\backend; uv run alembic upgrade head; cd C:\Users\Administrator\finnewsactual1; .\dev.ps1
 ```
 
-Frontend window:
-
-```powershell
-npm i
-npm run dev
-```
-
-Default frontend URL:
-
-```text
-http://localhost:3000
-```
-
-If your backend entrypoint differs, adjust the module path but keep the same host and port as the frontend env variable.
+Nastepnie otworz: **http://localhost:3000**
 
 ## MVP features
 

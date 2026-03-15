@@ -17,6 +17,7 @@ from finnews.errors import NewsDataParsingError, UpstreamNewsProviderError
 from finnews.services.news_details_service import NewsDetailsService
 from finnews.services.news_list_service import NewsListService
 from finnews.services.selection_service import pick_top
+from finnews.services.web_search_service import WebSearchService
 from finnews.settings import settings
 from finnews.utils.region import normalize_region
 from finnews.utils.text import normalize_text
@@ -2455,6 +2456,7 @@ class BriefService:
         self.client = AxessoClient()
         self.list_service = NewsListService(self.client)
         self.details_service = NewsDetailsService(self.client)
+        self.web_search_service = WebSearchService()
         self._brief_cache: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
 
     def _cache_key(
@@ -2508,29 +2510,43 @@ class BriefService:
         *,
         continents: list[str],
         query: str | None,
+        user_query: str | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         # Fetch from all regions in parallel using per-continent quotas.
         # NA (US) gets the largest quota as it carries most global financial news (Reuters/AP/Bloomberg).
         # Other regions add local/regional coverage. Failures are skipped gracefully.
-        tasks: list[tuple[str, asyncio.Task[list[dict[str, Any]]]]] = []
+        # Web search (Bing) runs in parallel when BING_SEARCH_API_KEY is configured.
+        axesso_tasks: list[tuple[str, asyncio.Task[list[dict[str, Any]]]]] = []
         for continent, axesso_regions in CONTINENT_TO_AXESSO_REGIONS.items():
             quota = REGION_FETCH_QUOTAS.get(continent, 10)
             primary_region = axesso_regions[0]
             task = asyncio.create_task(
                 self.list_service.fetch_normalized(s=query, region=primary_region, limit=quota)
             )
-            tasks.append((continent, task))
+            axesso_tasks.append((continent, task))
 
-        results = await asyncio.gather(*[t for _, t in tasks], return_exceptions=True)
+        web_task: asyncio.Task[list[dict[str, Any]]] = asyncio.create_task(
+            self.web_search_service.fetch_items(user_query)
+        )
+
+        axesso_results = await asyncio.gather(*[t for _, t in axesso_tasks], return_exceptions=True)
+        web_results: list[dict[str, Any]] | Exception = await web_task
 
         all_items: list[dict[str, Any]] = []
         total_raw = 0
-        for (continent, _), result in zip(tasks, results):
+        for (continent, _), result in zip(axesso_tasks, axesso_results):
             if isinstance(result, Exception):
                 logger.warning("Failed to fetch news for continent %s: %s", continent, result)
                 continue
             total_raw += len(result)
             all_items.extend(result)
+
+        if isinstance(web_results, Exception):
+            logger.warning("web_search fetch error: %s", web_results)
+        elif web_results:
+            logger.info("web_search enrichment adding %d items", len(web_results))
+            total_raw += len(web_results)
+            all_items.extend(web_results)
 
         return _dedupe_items(all_items), total_raw
 
@@ -2624,6 +2640,7 @@ class BriefService:
                 items, fetched_count = await self._fetch_merged_items(
                     continents=fetch_continents,
                     query=axesso_query,
+                    user_query=normalized_query or query,
                 )
             except (NewsDataParsingError, UpstreamNewsProviderError) as exc:
                 list_fetch_status = "failed"

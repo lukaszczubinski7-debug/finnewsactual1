@@ -302,6 +302,32 @@ CONTEXT_KEYWORDS: dict[str, list[str]] = {
 }
 
 TRUSTED_PROVIDER_MARKERS = ("reuters", "associated press", "ap", "bloomberg")
+
+# Sources known for clickbait/filler content on Yahoo Finance feed — penalized in scoring
+CLICKBAIT_PROVIDER_MARKERS = (
+    "motley fool",
+    "benzinga",
+    "investorplace",
+    "24/7 wall st",
+    "247 wall st",
+    "thestreet",
+    "kiplinger",
+    "gobankingrates",
+    "moneywise",
+    "fool.com",
+    "stockanalysis",
+    "smarteranalyst",
+    "zacks",
+)
+
+# Clickbait title patterns — engagement bait without substance
+_CLICKBAIT_TITLE_RE = re.compile(
+    r"\b(should you|here'?s why|need to know|you need to|top \d+ stocks|best \d+ "
+    r"etf|why you should|why you shouldn'?t|this is why|is it too late|will it "
+    r"crash|could soar|could surge|could skyrocket|don'?t miss|massive gains|"
+    r"hidden gem|secret|must.?buy|must.?own)\b",
+    re.IGNORECASE,
+)
 LEGACY_QUERY_TO_CONTEXT = {
     "earnings": CONTEXT_EARNINGS,
     "dividend": CONTEXT_EARNINGS,
@@ -680,9 +706,24 @@ def _provider_boost(item: dict[str, Any]) -> tuple[int, str | None]:
     provider = normalize_text(item.get("provider") or "").casefold()
     if not provider:
         return 0, None
+    for marker in CLICKBAIT_PROVIDER_MARKERS:
+        if marker in provider:
+            return -3, f"clickbait source: {normalize_text(item.get('provider') or '')}"
     for marker in TRUSTED_PROVIDER_MARKERS:
         if marker in provider:
             return 2, normalize_text(item.get("provider") or "")
+    return 0, None
+
+
+def _title_quality_penalty(item: dict[str, Any]) -> tuple[int, str | None]:
+    """Penalize titles that are engagement bait without hard data."""
+    title = item.get("title") or ""
+    if _CLICKBAIT_TITLE_RE.search(title):
+        return -2, "clickbait title pattern"
+    # Penalize question-only titles (no number, no proper noun signal)
+    stripped = title.strip()
+    if stripped.endswith("?") and not re.search(r"\d", stripped):
+        return -1, "rhetorical question title"
     return 0, None
 
 
@@ -868,7 +909,14 @@ def _context_signals(item: dict[str, Any], *, context: str, geo_focus: str | Non
     provider_score, provider_reason = _provider_boost(item)
     if provider_score:
         score += provider_score
-        reasons.append(provider_reason or "trusted provider")
+        if provider_reason:
+            reasons.append(provider_reason)
+
+    title_penalty, title_reason = _title_quality_penalty(item)
+    if title_penalty:
+        score += title_penalty
+        if title_reason:
+            reasons.append(title_reason)
 
     freshness_score, freshness_reason = _freshness_boost(item, now=now)
     score += freshness_score

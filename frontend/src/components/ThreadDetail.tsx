@@ -339,6 +339,17 @@ export default function ThreadDetail({ thread, onClose }: { thread: Thread; onCl
                         <HorizonBadge horizon={sc.horizon} />
                       </div>
 
+                      {/* probability rationale — CoT reasoning */}
+                      {sc.probability_rationale && (
+                        <div style={{ background: "rgba(74,106,140,0.08)", borderRadius: 8,
+                          padding: "10px 14px", borderLeft: "3px solid rgba(74,106,140,0.35)" }}>
+                          <div style={{ ...LABEL, color: "#5a7a9c" }}>Uzasadnienie oceny</div>
+                          <p style={{ margin: 0, color: "#7a9abc", fontSize: 12, lineHeight: 1.7, fontStyle: "italic" }}>
+                            {sc.probability_rationale}
+                          </p>
+                        </div>
+                      )}
+
                       {/* trigger */}
                       <div style={{ background: "rgba(74,106,140,0.1)", borderRadius: 8, padding: "10px 14px" }}>
                         <div style={LABEL}>Trigger</div>

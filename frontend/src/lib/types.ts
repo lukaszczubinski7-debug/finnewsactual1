@@ -133,6 +133,7 @@ export type ThreadScenario = {
   name: string;
   trigger: string;
   probability: string;
+  probability_rationale?: string;
   horizon?: string;
   outcome?: string;
   signal?: string;
@@ -152,7 +153,15 @@ export type ThreadBackgroundSections = {
   trigger: string;
 };
 
+export type ThreadThinking = {
+  kluczowe_fakty?: string;
+  lancuchy_przyczynowe?: string;
+  aktorzy_i_interesy?: string;
+  niepewnosci?: string;
+};
+
 export type ThreadSnapshot = {
+  thinking?: ThreadThinking;
   background_sections?: ThreadBackgroundSections;
   background?: string;
   key_actors?: { name: string; role: string; position: string }[];

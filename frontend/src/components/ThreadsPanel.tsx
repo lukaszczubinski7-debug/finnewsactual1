@@ -10,6 +10,7 @@ type Props = {
   refreshingId: number | null;
   refreshingAll: boolean;
   error: string | null;
+  selectedId: number | null;
   onCreate: (req: ThreadCreateRequest) => void;
   onRefresh: (id: number) => void;
   onRefreshAll: () => void;
@@ -76,6 +77,7 @@ export default function ThreadsPanel({
   refreshingId,
   refreshingAll,
   error,
+  selectedId,
   onCreate,
   onRefresh,
   onRefreshAll,
@@ -84,21 +86,17 @@ export default function ThreadsPanel({
 }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
-  const [assets, setAssets] = useState("");
-  const [horizon, setHorizon] = useState<7 | 30 | 90>(30);
   const [extraContext, setExtraContext] = useState("");
 
   const handleSubmit = () => {
     if (!name.trim()) return;
     onCreate({
       name: name.trim(),
-      assets: assets.trim() || null,
-      horizon_days: horizon,
+      assets: null,
+      horizon_days: 30,
       extra_context: extraContext.trim() || null,
     });
     setName("");
-    setAssets("");
-    setHorizon(30);
     setExtraContext("");
     setShowForm(false);
   };
@@ -170,33 +168,6 @@ export default function ThreadsPanel({
               />
             </div>
             <div>
-              <div style={labelStyle}>Kluczowe aktywa / rynki</div>
-              <input
-                style={{ ...inputStyle, marginTop: 6 }}
-                placeholder="np. WTI, złoto, USD/ILS"
-                value={assets}
-                onChange={(e) => setAssets(e.target.value)}
-                maxLength={500}
-              />
-            </div>
-            <div>
-              <div style={labelStyle}>Horyzont monitorowania</div>
-              <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                {HORIZON_OPTIONS.map((opt) => (
-                  <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "#c6d8f4", fontSize: 14 }}>
-                    <input
-                      type="radio"
-                      name="horizon"
-                      value={opt.value}
-                      checked={horizon === opt.value}
-                      onChange={() => setHorizon(opt.value)}
-                    />
-                    {opt.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
               <div style={labelStyle}>Dodatkowy kontekst</div>
               <textarea
                 style={{ ...inputStyle, marginTop: 6, height: 60, resize: "vertical" }}
@@ -244,19 +215,42 @@ export default function ThreadsPanel({
         </div>
       )}
 
+      {/* Creating indicator */}
+      {creating && (
+        <div style={{ ...cardStyle, border: "1px solid rgba(80,120,180,0.4)" }}>
+          <div style={{ color: "#8ab4f0", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⏳</span>
+            Tworzenie wątku... AI analizuje temat (~30s)
+          </div>
+        </div>
+      )}
+
       {/* Thread list */}
       {loading && threads.length === 0 && (
         <div style={{ color: "#9fb6d8", fontSize: 14 }}>Ładowanie wątków...</div>
       )}
 
-      {!loading && threads.length === 0 && !showForm && (
+      {!loading && !creating && threads.length === 0 && !showForm && (
         <div style={{ color: "#6a8aaa", fontSize: 14 }}>
           Brak wątków. Kliknij &ldquo;+ Nowy wątek&rdquo; by zacząć śledzić temat.
         </div>
       )}
 
       {threads.map((thread) => (
-        <div key={thread.id} style={{ ...cardStyle, cursor: "pointer" }} onClick={() => onSelect(thread)}>
+        <div
+          key={thread.id}
+          style={{
+            ...cardStyle,
+            cursor: "pointer",
+            border: selectedId === thread.id
+              ? "1px solid rgba(80,120,180,0.7)"
+              : cardStyle.border,
+            background: selectedId === thread.id
+              ? "rgba(30,45,68,0.98)"
+              : cardStyle.background,
+          }}
+          onClick={() => onSelect(thread)}
+        >
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: "#dce9ff", fontSize: 16, fontWeight: 600, marginBottom: 4 }}>

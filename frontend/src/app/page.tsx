@@ -346,6 +346,103 @@ export default function Page() {
     }
   };
 
+  const leftColumn = (
+    <div style={{ display: "grid", gap: 22 }}>
+      <section className={styles.panel}>
+        <HeaderBar />
+        <AuthProfilePanel
+          user={user}
+          authMode={authMode}
+          loading={authLoading}
+          error={authError}
+          preference={preferences}
+          preferenceLoading={preferenceLoading}
+          onOpenLogin={() => {
+            setAuthError(null);
+            setAuthMode("login");
+          }}
+          onOpenRegister={() => {
+            setAuthError(null);
+            setAuthMode("register");
+          }}
+          onOpenProfile={() => {
+            if (!token) {
+              setAuthError("Brak sesji uzytkownika.");
+              return;
+            }
+            setAuthError(null);
+            setAuthMode("profile");
+            void loadPreferences(token);
+          }}
+          onClose={() => setAuthMode("closed")}
+          onLogin={handleLogin}
+          onRegister={handleRegister}
+          onLogout={handleLogout}
+          onDeleteAccount={handleDeleteAccount}
+          onSavePreferences={handleSavePreferences}
+        />
+        <AnalysisPanel
+          mainQuestion={mainQuestion}
+          disabled={loading}
+          validationMessage={inputValidationMessage}
+          onMainQuestionChange={(value) => {
+            setInputValidationMessage(null);
+            setMainQuestion(value);
+          }}
+        />
+        <FooterActions canGenerate={canGenerate} loading={loading} onGenerate={handleSubmit} onCancel={handleCancel} />
+      </section>
+
+      {error ? (
+        <section
+          role="alert"
+          className={styles.panel}
+          style={{
+            borderColor: "rgba(217, 86, 86, 0.58)",
+            boxShadow:
+              "inset 0 0 0 1px rgba(217, 86, 86, 0.24), inset 0 0 24px rgba(217, 86, 86, 0.12), 0 12px 30px rgba(6, 8, 12, 0.45)",
+            padding: "14px 16px",
+            color: "#ffd7d7",
+          }}
+        >
+          <strong style={{ display: "block", marginBottom: 6, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            Blad backendu{error.status ? ` (${error.status})` : ""}
+          </strong>
+          <span>{error.message}</span>
+        </section>
+      ) : null}
+
+      {loading ? (
+        <section className={styles.panel} style={{ padding: "14px 16px", color: "#c6d8f4" }}>
+          Trwa generowanie briefu...
+        </section>
+      ) : null}
+
+      {authLoading && !loading ? (
+        <section className={styles.panel} style={{ padding: "14px 16px", color: "#c6d8f4" }}>
+          Trwa synchronizacja sesji...
+        </section>
+      ) : null}
+
+      {result ? <BriefResult result={result} /> : null}
+
+      {threadSuggestion && token ? (
+        <ThreadSuggestionBanner
+          suggestion={threadSuggestion}
+          onCreate={handleCreateThread}
+          onDismiss={() => setThreadSuggestion(null)}
+        />
+      ) : null}
+
+      {selectedThread ? (
+        <ThreadDetail
+          thread={selectedThread}
+          onClose={() => setSelectedThread(null)}
+        />
+      ) : null}
+    </div>
+  );
+
   return (
     <main
       style={{
@@ -355,95 +452,19 @@ export default function Page() {
           "radial-gradient(circle at top right, rgba(72, 93, 123, 0.2) 0%, transparent 35%), radial-gradient(circle at bottom left, rgba(72, 97, 131, 0.12) 0%, transparent 30%), linear-gradient(180deg, #0a0f16 0%, #05090f 100%)",
       }}
     >
-      <div style={{ maxWidth: 1180, margin: "0 auto", display: "grid", gap: 22 }}>
-        <section className={styles.panel}>
-          <HeaderBar />
-          <AuthProfilePanel
-            user={user}
-            authMode={authMode}
-            loading={authLoading}
-            error={authError}
-            preference={preferences}
-            preferenceLoading={preferenceLoading}
-            onOpenLogin={() => {
-              setAuthError(null);
-              setAuthMode("login");
-            }}
-            onOpenRegister={() => {
-              setAuthError(null);
-              setAuthMode("register");
-            }}
-            onOpenProfile={() => {
-              if (!token) {
-                setAuthError("Brak sesji uzytkownika.");
-                return;
-              }
-              setAuthError(null);
-              setAuthMode("profile");
-              void loadPreferences(token);
-            }}
-            onClose={() => setAuthMode("closed")}
-            onLogin={handleLogin}
-            onRegister={handleRegister}
-            onLogout={handleLogout}
-            onDeleteAccount={handleDeleteAccount}
-            onSavePreferences={handleSavePreferences}
-          />
-          <AnalysisPanel
-            mainQuestion={mainQuestion}
-            disabled={loading}
-            validationMessage={inputValidationMessage}
-            onMainQuestionChange={(value) => {
-              setInputValidationMessage(null);
-              setMainQuestion(value);
-            }}
-          />
-          <FooterActions canGenerate={canGenerate} loading={loading} onGenerate={handleSubmit} onCancel={handleCancel} />
-        </section>
-
-        {error ? (
-          <section
-            role="alert"
-            className={styles.panel}
-            style={{
-              borderColor: "rgba(217, 86, 86, 0.58)",
-              boxShadow:
-                "inset 0 0 0 1px rgba(217, 86, 86, 0.24), inset 0 0 24px rgba(217, 86, 86, 0.12), 0 12px 30px rgba(6, 8, 12, 0.45)",
-              padding: "14px 16px",
-              color: "#ffd7d7",
-            }}
-          >
-            <strong style={{ display: "block", marginBottom: 6, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-              Blad backendu{error.status ? ` (${error.status})` : ""}
-            </strong>
-            <span>{error.message}</span>
-          </section>
-        ) : null}
-
-        {loading ? (
-          <section className={styles.panel} style={{ padding: "14px 16px", color: "#c6d8f4" }}>
-            Trwa generowanie briefu...
-          </section>
-        ) : null}
-
-        {authLoading && !loading ? (
-          <section className={styles.panel} style={{ padding: "14px 16px", color: "#c6d8f4" }}>
-            Trwa synchronizacja sesji...
-          </section>
-        ) : null}
-
-        {result ? <BriefResult result={result} /> : null}
-
-        {threadSuggestion && token ? (
-          <ThreadSuggestionBanner
-            suggestion={threadSuggestion}
-            onCreate={handleCreateThread}
-            onDismiss={() => setThreadSuggestion(null)}
-          />
-        ) : null}
-
-        {user && token ? (
-          <>
+      {user && token ? (
+        <div
+          style={{
+            maxWidth: 1600,
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "1fr 340px",
+            gap: 22,
+            alignItems: "start",
+          }}
+        >
+          {leftColumn}
+          <div style={{ position: "sticky", top: 26 }}>
             <ThreadsPanel
               threads={threads}
               loading={threadLoading}
@@ -457,16 +478,13 @@ export default function Page() {
               onRefreshAll={handleRefreshAll}
               onDelete={handleDeleteThread}
             />
-
-            {selectedThread ? (
-              <ThreadDetail
-                thread={selectedThread}
-                onClose={() => setSelectedThread(null)}
-              />
-            ) : null}
-          </>
-        ) : null}
-      </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+          {leftColumn}
+        </div>
+      )}
     </main>
   );
 }

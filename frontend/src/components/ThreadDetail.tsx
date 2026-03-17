@@ -3,7 +3,6 @@
 import { useState } from "react";
 import type { Thread, ThreadDevelopment, ThreadScenario, ThreadSectorImpact } from "../lib/types";
 
-/* ─── tokens ─────────────────────────────────────────────────── */
 const BG = "rgba(14,22,34,0.96)";
 const BORDER = "1px solid rgba(186,205,231,0.13)";
 const LABEL: React.CSSProperties = {
@@ -12,15 +11,16 @@ const LABEL: React.CSSProperties = {
 };
 const CARD: React.CSSProperties = { background: BG, border: BORDER, borderRadius: 12, padding: "16px 20px" };
 
-type Tab = "teraz" | "historia" | "scenariusze" | "rynki";
+type Tab = "teraz" | "geneza" | "os_czasu" | "aktorzy" | "scenariusze" | "rynki";
 const TABS: { key: Tab; label: string }[] = [
   { key: "teraz",       label: "Teraz" },
-  { key: "historia",    label: "Historia" },
+  { key: "geneza",      label: "Geneza" },
+  { key: "os_czasu",    label: "Oś czasu" },
+  { key: "aktorzy",     label: "Aktorzy" },
   { key: "scenariusze", label: "Scenariusze" },
-  { key: "rynki",       label: "Wpływ na rynki" },
+  { key: "rynki",       label: "Rynki" },
 ];
 
-/* ─── sub-components ─────────────────────────────────────────── */
 function ProbBadge({ prob }: { prob: string }) {
   const p = prob?.toLowerCase() ?? "";
   const color = p === "wysoka" ? "#e06060" : p === "srednia" ? "#d4a830" : "#50b878";
@@ -71,7 +71,6 @@ function SectorGrid({ items }: { items: ThreadSectorImpact[] }) {
   );
 }
 
-/* ─── main ───────────────────────────────────────────────────── */
 export default function ThreadDetail({ thread, onClose }: { thread: Thread; onClose: () => void }) {
   const [activeTab, setActiveTab] = useState<Tab>("teraz");
   const snap = thread.context_snapshot;
@@ -114,12 +113,13 @@ export default function ThreadDetail({ thread, onClose }: { thread: Thread; onCl
       </div>
 
       {/* TABS */}
-      <div style={{ display: "flex", gap: 6, padding: "14px 28px 0",
+      <div style={{ display: "flex", gap: 4, padding: "12px 28px 0", flexWrap: "wrap",
         borderBottom: "1px solid rgba(186,205,231,0.08)" }}>
         {TABS.map((t) => (
           <button key={t.key} type="button" onClick={() => setActiveTab(t.key)}
             style={{
-              padding: "8px 18px", borderRadius: "10px 10px 0 0",
+              padding: "7px 16px",
+              borderRadius: "10px 10px 0 0",
               border: activeTab === t.key ? "1px solid rgba(80,120,180,0.5)" : "1px solid transparent",
               borderBottom: activeTab === t.key ? "1px solid rgba(16,24,36,0.99)" : "1px solid transparent",
               background: activeTab === t.key ? "rgba(80,120,180,0.18)" : "transparent",
@@ -134,7 +134,7 @@ export default function ThreadDetail({ thread, onClose }: { thread: Thread; onCl
       </div>
 
       {/* BODY */}
-      <div style={{ padding: "22px 28px 36px", display: "grid", gap: 20 }}>
+      <div style={{ padding: "22px 28px 36px", display: "grid", gap: 16 }}>
 
         {!snap && (
           <div style={{ color: "#6a90bc", fontSize: 14 }}>
@@ -175,8 +175,9 @@ export default function ThreadDetail({ thread, onClose }: { thread: Thread; onCl
                             background: "rgba(74,106,140,0.15)", borderRadius: 6, padding: "2px 8px" }}>
                             {dev.date}
                           </span>
-                          <div style={{ color: "#dce9ff", fontSize: 14, fontWeight: 700,
-                            margin: "8px 0 6px" }}>{dev.title}</div>
+                          <div style={{ color: "#dce9ff", fontSize: 14, fontWeight: 700, margin: "8px 0 6px" }}>
+                            {dev.title}
+                          </div>
                           <p style={{ margin: 0, color: "#9fb6d8", fontSize: 13, lineHeight: 1.65 }}>{dev.body}</p>
                         </div>
                       ))}
@@ -186,61 +187,71 @@ export default function ThreadDetail({ thread, onClose }: { thread: Thread; onCl
               </div>
             )}
 
-            {/* ── HISTORIA ── */}
-            {activeTab === "historia" && (
-              <div style={{ display: "grid", gap: 20 }}>
-                {snap.background && (
-                  <div>
-                    <div style={LABEL}>Geneza konfliktu</div>
-                    <div style={CARD}>
-                      <p style={{ margin: 0, color: "#c6d8f4", fontSize: 14, lineHeight: 1.75 }}>
-                        {snap.background}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {(snap.timeline ?? []).length > 0 && (
-                  <div>
-                    <div style={LABEL}>Oś czasu</div>
+            {/* ── GENEZA ── */}
+            {activeTab === "geneza" && (
+              <div>
+                {snap.background
+                  ? <div style={CARD}><p style={{ margin: 0, color: "#c6d8f4", fontSize: 14, lineHeight: 1.75 }}>{snap.background}</p></div>
+                  : <div style={{ color: "#5a7a9c", fontSize: 14 }}>Brak danych o genezie.</div>
+                }
+              </div>
+            )}
+
+            {/* ── OŚ CZASU ── */}
+            {activeTab === "os_czasu" && (
+              <div>
+                {(snap.timeline ?? []).length === 0
+                  ? <div style={{ color: "#5a7a9c", fontSize: 14 }}>Brak osi czasu.</div>
+                  : (
                     <div style={{ paddingLeft: 12 }}>
                       {snap.timeline!.map((ev, i) => {
                         const sigCol = ev.significance === "wysokie" ? "#e06060"
                           : ev.significance === "srednie" ? "#d4a830" : "#4a6a8c";
                         const isLast = i === snap.timeline!.length - 1;
                         return (
-                          <div key={i} style={{ display: "grid", gridTemplateColumns: "14px 100px 1fr",
-                            gap: "0 12px", paddingBottom: isLast ? 0 : 16 }}>
+                          <div key={i} style={{ display: "grid", gridTemplateColumns: "14px 110px 1fr",
+                            gap: "0 14px", paddingBottom: isLast ? 0 : 18 }}>
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 3 }}>
                               <div style={{ width: 10, height: 10, borderRadius: "50%", background: sigCol, flexShrink: 0 }} />
                               {!isLast && <div style={{ flex: 1, width: 2, background: "rgba(186,205,231,0.12)", marginTop: 4 }} />}
                             </div>
                             <div style={{ color: "#5a7a9c", fontSize: 12, paddingTop: 1 }}>{ev.date}</div>
-                            <div style={{ color: "#c6d8f4", fontSize: 13, lineHeight: 1.5 }}>{ev.event}</div>
+                            <div>
+                              <div style={{ color: "#c6d8f4", fontSize: 13, lineHeight: 1.5 }}>{ev.event}</div>
+                              <div style={{ color: sigCol, fontSize: 10, fontWeight: 700, marginTop: 2,
+                                letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                                {ev.significance === "wysokie" ? "● wysokie" : ev.significance === "srednie" ? "● średnie" : "● niskie"}
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
-                )}
-                {(snap.key_actors ?? []).length > 0 && (
-                  <div>
-                    <div style={LABEL}>Kluczowi aktorzy</div>
-                    <div style={{ display: "grid", gap: 6 }}>
+                  )
+                }
+              </div>
+            )}
+
+            {/* ── AKTORZY ── */}
+            {activeTab === "aktorzy" && (
+              <div>
+                {(snap.key_actors ?? []).length === 0
+                  ? <div style={{ color: "#5a7a9c", fontSize: 14 }}>Brak kluczowych aktorów.</div>
+                  : (
+                    <div style={{ display: "grid", gap: 8 }}>
                       {snap.key_actors!.map((actor, i) => (
                         <div key={i} style={{ ...CARD, display: "grid",
-                          gridTemplateColumns: "160px 1fr", gap: 12, padding: "10px 16px" }}>
-                          <div style={{ color: "#dce9ff", fontSize: 13, fontWeight: 700 }}>
-                            {actor.name}
-                            <div style={{ color: "#5a7a9c", fontSize: 11, fontWeight: 400, marginTop: 2 }}>
-                              {actor.role}
-                            </div>
+                          gridTemplateColumns: "180px 1fr", gap: 14, padding: "12px 18px" }}>
+                          <div>
+                            <div style={{ color: "#dce9ff", fontSize: 14, fontWeight: 700 }}>{actor.name}</div>
+                            <div style={{ color: "#5a7a9c", fontSize: 11, marginTop: 3 }}>{actor.role}</div>
                           </div>
-                          <div style={{ color: "#9fb6d8", fontSize: 13 }}>{actor.position}</div>
+                          <div style={{ color: "#9fb6d8", fontSize: 13, lineHeight: 1.6 }}>{actor.position}</div>
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )
+                }
               </div>
             )}
 
@@ -304,7 +315,7 @@ export default function ThreadDetail({ thread, onClose }: { thread: Thread; onCl
                   if (!all.length) return null;
                   return (
                     <div>
-                      <div style={LABEL}>Wpływ na sektory — stan bazowy</div>
+                      <div style={LABEL}>Wpływ na sektory</div>
                       <SectorGrid items={all} />
                     </div>
                   );

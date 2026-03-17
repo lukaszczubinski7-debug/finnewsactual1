@@ -84,21 +84,17 @@ export default function ThreadsPanel({
 }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
-  const [assets, setAssets] = useState("");
-  const [horizon, setHorizon] = useState<7 | 30 | 90>(30);
   const [extraContext, setExtraContext] = useState("");
 
   const handleSubmit = () => {
     if (!name.trim()) return;
     onCreate({
       name: name.trim(),
-      assets: assets.trim() || null,
-      horizon_days: horizon,
+      assets: null,
+      horizon_days: 30,
       extra_context: extraContext.trim() || null,
     });
     setName("");
-    setAssets("");
-    setHorizon(30);
     setExtraContext("");
     setShowForm(false);
   };
@@ -168,33 +164,6 @@ export default function ThreadsPanel({
                 onChange={(e) => setName(e.target.value)}
                 maxLength={500}
               />
-            </div>
-            <div>
-              <div style={labelStyle}>Kluczowe aktywa / rynki</div>
-              <input
-                style={{ ...inputStyle, marginTop: 6 }}
-                placeholder="np. WTI, złoto, USD/ILS"
-                value={assets}
-                onChange={(e) => setAssets(e.target.value)}
-                maxLength={500}
-              />
-            </div>
-            <div>
-              <div style={labelStyle}>Horyzont monitorowania</div>
-              <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                {HORIZON_OPTIONS.map((opt) => (
-                  <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "#c6d8f4", fontSize: 14 }}>
-                    <input
-                      type="radio"
-                      name="horizon"
-                      value={opt.value}
-                      checked={horizon === opt.value}
-                      onChange={() => setHorizon(opt.value)}
-                    />
-                    {opt.label}
-                  </label>
-                ))}
-              </div>
             </div>
             <div>
               <div style={labelStyle}>Dodatkowy kontekst</div>

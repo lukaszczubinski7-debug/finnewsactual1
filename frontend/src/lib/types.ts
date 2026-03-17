@@ -123,24 +123,24 @@ export type ThreadCreateRequest = {
   extra_context?: string | null;
 };
 
+export type ThreadSectorImpact = {
+  sector: string;
+  direction: "up" | "down" | "mixed";
+  why: string;
+};
+
 export type ThreadScenario = {
   name: string;
   trigger: string;
   probability: string;
-  market_impact: string;
+  sector_impacts?: ThreadSectorImpact[];
+  market_impact?: string; // legacy fallback
 };
 
 export type ThreadDevelopment = {
   date: string;
   title: string;
   body: string;
-};
-
-export type ThreadAsset = {
-  asset: string;
-  direction: string;
-  why: string;
-  confidence: string;
 };
 
 export type ThreadSnapshot = {
@@ -151,8 +151,9 @@ export type ThreadSnapshot = {
   latest_developments?: ThreadDevelopment[];
   scenarios?: ThreadScenario[];
   market_implications?: {
-    assets?: ThreadAsset[];
-    sectors?: string[];
+    sector_impacts?: ThreadSectorImpact[];
+    assets?: { asset: string; direction: string; why: string; confidence: string }[]; // legacy
+    sectors?: string[]; // legacy
     correlation_map?: string;
   };
   sources_used?: { title: string; url: string; provider: string }[];

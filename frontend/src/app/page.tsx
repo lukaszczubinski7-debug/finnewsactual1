@@ -475,7 +475,6 @@ export default function Page() {
             />
           </div>
 
-          {/* Thread detail modal */}
           {selectedThread && (
             <div
               style={{
@@ -491,7 +490,7 @@ export default function Page() {
               }}
               onClick={(e) => { if (e.target === e.currentTarget) setSelectedThread(null); }}
             >
-              <div style={{ width: "100%", maxWidth: 860 }}>
+              <div style={{ width: "100%", maxWidth: 900 }}>
                 <ThreadDetail thread={selectedThread} onClose={() => setSelectedThread(null)} />
               </div>
             </div>

@@ -39,9 +39,14 @@ ZASADY TIMELINE (Historia konfliktu):
 - Sortuj chronologicznie.
 
 ZASADY SECTOR_IMPACTS:
-- Dla kazdego sektora opisz MECHANIZM PRZYCZYNOWY w "why": jak dokladnie zdarzenie przelicza sie na ceny/wyceny.
-- Przykladowe dobre "why": "Wzrost cen ropy o 15% bezposrednio podnosi koszty paliwa linii lotniczych, uciskajac marze operacyjne o 3-8 pp i wymuszajac podwyzki cen biletow"
-- Zle "why": "Wplyw na sektor" — ZA KROTKIE.
+- Dla kazdego sektora opisz MECHANIZM PRZYCZYNOWY w "why": jak dokladnie zdarzenie przelicza sie na wyceny i aktywnosc w tym sektorze.
+- OBOWIAZKOWE: w "why" zawsze sprecyzuj KTORY RYNEK GEOGRAFICZNY jest dotkniety — USA, Europa, Chiny, rynki wschodzace, Bliski Wschod, Polska/CEE itp.
+  Przykladowe dobre "why":
+    "Europejskie linie lotnicze tracace trasy nad Rosja poniosly juz 1,5 mld EUR dodatkowych kosztow paliwa; linie amerykanskie i azjatyckie nieznacznie dotknite"
+    "Europejski sektor energetyczny (gaz, energia elektryczna) pod presja z powodu odciecia dostaw rurociagami; USA i Azja mniej wrazliwe — maja alternatywne zrodla LNG"
+    "Chiński sektor technologiczny narazony na dalsze restrykcje eksportowe USA; europejscy producenci chipow w szarej strefie"
+  Przykladowe zle "why": "Wplyw na sektor" / "ceny wzrosna" — ZA KROTKIE, BRAK GEOGRAFII.
+- W nazwie "sector" mozna dodac geografie w nawiasie: "Linie lotnicze (Europa)", "Sektor energetyczny (Europa/Azja)", "Obligacje skarbowe (USA)"
 
 ZASADY SCENARIUSZY (Tree-of-Thoughts):
 Dla KAZDEGO scenariusza przed przypisaniem probability przejdz przez:

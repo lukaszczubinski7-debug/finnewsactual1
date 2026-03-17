@@ -396,14 +396,27 @@ export default function ThreadDetail({ thread, onClose }: { thread: Thread; onCl
             {/* ── RYNKI ── */}
             {activeTab === "rynki" && (
               <div style={{ display: "grid", gap: 20 }}>
+
+                {/* info chip */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8,
+                  background: "rgba(74,106,140,0.1)", borderRadius: 8, padding: "8px 14px" }}>
+                  <span style={{ fontSize: 13 }}>📊</span>
+                  <span style={{ color: "#5a7a9c", fontSize: 12, lineHeight: 1.5 }}>
+                    Wpływ konfliktu na poszczególne rynki geograficzne i sektory —
+                    <strong style={{ color: "#7a9abc" }}> nie prognoza cen aktywów</strong>,
+                    lecz analiza mechanizmów transmisji geopolitycznej.
+                  </span>
+                </div>
+
                 {snap.market_implications?.correlation_map && (
                   <div style={{ ...CARD, borderLeft: "3px solid rgba(186,205,231,0.35)" }}>
-                    <div style={LABEL}>Mechanizm transmisji rynkowej</div>
+                    <div style={LABEL}>Mechanizm transmisji</div>
                     <p style={{ margin: 0, color: "#c6d8f4", fontSize: 14, lineHeight: 1.8, fontStyle: "italic" }}>
                       {snap.market_implications.correlation_map}
                     </p>
                   </div>
                 )}
+
                 {(() => {
                   const sectors = snap.market_implications?.sector_impacts ?? [];
                   const legacy = (snap.market_implications?.assets ?? []).map((a) => ({
@@ -415,7 +428,7 @@ export default function ThreadDetail({ thread, onClose }: { thread: Thread; onCl
                   if (!all.length) return null;
                   return (
                     <div>
-                      <div style={LABEL}>Wpływ na sektory — stan bazowy</div>
+                      <div style={LABEL}>Wpływ na rynki i sektory</div>
                       <SectorGrid items={all} />
                     </div>
                   );

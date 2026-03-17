@@ -17,6 +17,7 @@ PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
 PROMPT_THREAD_INIT = "thread_init.md"
 PROMPT_THREAD_REFRESH = "thread_refresh.md"
 PROMPT_THREAD_SUGGEST = "thread_suggest.md"
+PROMPT_THREAD_VERIFY = "thread_verify.md"
 
 VALID_HORIZON_DAYS = {7, 30, 90}
 MAX_THREADS_PER_USER = 20
@@ -150,6 +151,38 @@ class ThreadService:
             logger.warning("Thread suggest LLM failed: %s", exc)
             return None
 
+    async def _verify_snapshot(self, snapshot: dict[str, Any]) -> dict[str, Any]:
+        """Run a lightweight LLM quality-check pass on the snapshot.
+
+        Uses gpt-4.1-mini for speed and cost. On any error, returns the
+        original snapshot unchanged so the pipeline never hard-fails.
+        """
+        user_content = json.dumps(
+            {
+                "today": datetime.now(UTC).strftime("%Y-%m-%d"),
+                "snapshot": snapshot,
+            },
+            ensure_ascii=False,
+        )
+        system = _load_prompt(PROMPT_THREAD_VERIFY)
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_content},
+        ]
+        try:
+            raw = await self.llm.complete(messages, temperature=0.0)
+            raw = raw.strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            result = json.loads(raw)
+            issues = result.get("issues_found", [])
+            if issues:
+                logger.info("Thread verify fixed %d issue(s): %s", len(issues), issues)
+            return result.get("snapshot", snapshot)
+        except Exception as exc:
+            logger.warning("Thread verify failed (using original snapshot): %s", exc)
+            return snapshot
+
     async def _generate_init_snapshot(
         self,
         *,
@@ -161,6 +194,7 @@ class ThreadService:
         prompt_sources = _sources_for_prompt(sources)
         user_content = json.dumps(
             {
+                "today": datetime.now(UTC).strftime("%Y-%m-%d"),
                 "thread_name": name,
                 "tracked_assets": assets or "",
                 "user_context": extra_context or "",
@@ -177,7 +211,8 @@ class ThreadService:
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        return json.loads(raw)
+        snapshot = json.loads(raw)
+        return await self._verify_snapshot(snapshot)
 
     async def _generate_refresh_snapshot(
         self,
@@ -189,6 +224,7 @@ class ThreadService:
         prompt_sources = _sources_for_prompt(new_sources)
         user_content = json.dumps(
             {
+                "today": datetime.now(UTC).strftime("%Y-%m-%d"),
                 "thread_name": thread_name,
                 "existing_snapshot": existing_snapshot,
                 "new_sources": prompt_sources,
@@ -207,4 +243,4 @@ class ThreadService:
         updated = json.loads(raw)
         # Ensure new_events_count is int
         updated["new_events_count"] = int(updated.get("new_events_count") or 0)
-        return updated
+        return await self._verify_snapshot(updated)

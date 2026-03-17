@@ -133,6 +133,9 @@ export type ThreadScenario = {
   name: string;
   trigger: string;
   probability: string;
+  horizon?: string;
+  outcome?: string;
+  signal?: string;
   sector_impacts?: ThreadSectorImpact[];
   market_impact?: string; // legacy fallback
 };
@@ -143,7 +146,14 @@ export type ThreadDevelopment = {
   body: string;
 };
 
+export type ThreadBackgroundSections = {
+  origins: string;
+  structural_causes: string;
+  trigger: string;
+};
+
 export type ThreadSnapshot = {
+  background_sections?: ThreadBackgroundSections;
   background?: string;
   key_actors?: { name: string; role: string; position: string }[];
   timeline?: { date: string; event: string; detail?: string; significance: string }[];

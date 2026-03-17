@@ -146,7 +146,7 @@ export type ThreadDevelopment = {
 export type ThreadSnapshot = {
   background?: string;
   key_actors?: { name: string; role: string; position: string }[];
-  timeline?: { date: string; event: string; significance: string }[];
+  timeline?: { date: string; event: string; detail?: string; significance: string }[];
   current_state?: string;
   latest_developments?: ThreadDevelopment[];
   scenarios?: ThreadScenario[];

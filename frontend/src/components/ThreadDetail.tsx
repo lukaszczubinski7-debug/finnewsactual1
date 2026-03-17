@@ -15,7 +15,7 @@ type Tab = "teraz" | "geneza" | "os_czasu" | "aktorzy" | "scenariusze" | "rynki"
 const TABS: { key: Tab; label: string }[] = [
   { key: "teraz",       label: "Teraz" },
   { key: "geneza",      label: "Geneza" },
-  { key: "os_czasu",    label: "Oś czasu" },
+  { key: "os_czasu",    label: "Historia konfliktu" },
   { key: "aktorzy",     label: "Aktorzy" },
   { key: "scenariusze", label: "Scenariusze" },
   { key: "rynki",       label: "Rynki" },
@@ -217,11 +217,12 @@ export default function ThreadDetail({ thread, onClose }: { thread: Thread; onCl
                             </div>
                             <div style={{ color: "#5a7a9c", fontSize: 12, paddingTop: 1 }}>{ev.date}</div>
                             <div>
-                              <div style={{ color: "#c6d8f4", fontSize: 13, lineHeight: 1.5 }}>{ev.event}</div>
-                              <div style={{ color: sigCol, fontSize: 10, fontWeight: 700, marginTop: 2,
-                                letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                                {ev.significance === "wysokie" ? "● wysokie" : ev.significance === "srednie" ? "● średnie" : "● niskie"}
-                              </div>
+                              <div style={{ color: "#c6d8f4", fontSize: 13, fontWeight: 600, lineHeight: 1.5 }}>{ev.event}</div>
+                              {ev.detail && (
+                                <div style={{ color: "#7a9abc", fontSize: 12, marginTop: 4, lineHeight: 1.6 }}>
+                                  {ev.detail}
+                                </div>
+                              )}
                             </div>
                           </div>
                         );

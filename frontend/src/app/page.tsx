@@ -434,12 +434,6 @@ export default function Page() {
         />
       ) : null}
 
-      {selectedThread ? (
-        <ThreadDetail
-          thread={selectedThread}
-          onClose={() => setSelectedThread(null)}
-        />
-      ) : null}
     </div>
   );
 
@@ -472,6 +466,7 @@ export default function Page() {
               refreshingAll={threadRefreshingAll}
               refreshingId={threadRefreshingId}
               error={threadError}
+              selectedId={selectedThread?.id ?? null}
               onSelect={(thread) => setSelectedThread(thread)}
               onCreate={handleCreateThread}
               onRefresh={handleRefreshThread}
@@ -479,6 +474,28 @@ export default function Page() {
               onDelete={handleDeleteThread}
             />
           </div>
+
+          {/* Thread detail modal */}
+          {selectedThread && (
+            <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 100,
+                background: "rgba(5,9,15,0.82)",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "center",
+                padding: "40px 18px 40px",
+                overflowY: "auto",
+              }}
+              onClick={(e) => { if (e.target === e.currentTarget) setSelectedThread(null); }}
+            >
+              <div style={{ width: "100%", maxWidth: 860 }}>
+                <ThreadDetail thread={selectedThread} onClose={() => setSelectedThread(null)} />
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ maxWidth: 1180, margin: "0 auto" }}>

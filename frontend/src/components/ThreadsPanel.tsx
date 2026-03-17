@@ -10,6 +10,7 @@ type Props = {
   refreshingId: number | null;
   refreshingAll: boolean;
   error: string | null;
+  selectedId: number | null;
   onCreate: (req: ThreadCreateRequest) => void;
   onRefresh: (id: number) => void;
   onRefreshAll: () => void;
@@ -76,6 +77,7 @@ export default function ThreadsPanel({
   refreshingId,
   refreshingAll,
   error,
+  selectedId,
   onCreate,
   onRefresh,
   onRefreshAll,
@@ -213,19 +215,42 @@ export default function ThreadsPanel({
         </div>
       )}
 
+      {/* Creating indicator */}
+      {creating && (
+        <div style={{ ...cardStyle, border: "1px solid rgba(80,120,180,0.4)" }}>
+          <div style={{ color: "#8ab4f0", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⏳</span>
+            Tworzenie wątku... AI analizuje temat (~30s)
+          </div>
+        </div>
+      )}
+
       {/* Thread list */}
       {loading && threads.length === 0 && (
         <div style={{ color: "#9fb6d8", fontSize: 14 }}>Ładowanie wątków...</div>
       )}
 
-      {!loading && threads.length === 0 && !showForm && (
+      {!loading && !creating && threads.length === 0 && !showForm && (
         <div style={{ color: "#6a8aaa", fontSize: 14 }}>
           Brak wątków. Kliknij &ldquo;+ Nowy wątek&rdquo; by zacząć śledzić temat.
         </div>
       )}
 
       {threads.map((thread) => (
-        <div key={thread.id} style={{ ...cardStyle, cursor: "pointer" }} onClick={() => onSelect(thread)}>
+        <div
+          key={thread.id}
+          style={{
+            ...cardStyle,
+            cursor: "pointer",
+            border: selectedId === thread.id
+              ? "1px solid rgba(80,120,180,0.7)"
+              : cardStyle.border,
+            background: selectedId === thread.id
+              ? "rgba(30,45,68,0.98)"
+              : cardStyle.background,
+          }}
+          onClick={() => onSelect(thread)}
+        >
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: "#dce9ff", fontSize: 16, fontWeight: 600, marginBottom: 4 }}>

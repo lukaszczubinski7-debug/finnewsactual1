@@ -161,6 +161,7 @@ class ThreadService:
         prompt_sources = _sources_for_prompt(sources)
         user_content = json.dumps(
             {
+                "today": datetime.now(UTC).strftime("%Y-%m-%d"),
                 "thread_name": name,
                 "tracked_assets": assets or "",
                 "user_context": extra_context or "",
@@ -189,6 +190,7 @@ class ThreadService:
         prompt_sources = _sources_for_prompt(new_sources)
         user_content = json.dumps(
             {
+                "today": datetime.now(UTC).strftime("%Y-%m-%d"),
                 "thread_name": thread_name,
                 "existing_snapshot": existing_snapshot,
                 "new_sources": prompt_sources,

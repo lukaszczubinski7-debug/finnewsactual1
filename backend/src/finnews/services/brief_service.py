@@ -2356,6 +2356,7 @@ async def _generate_summary_via_llm(
         ]
     )
     user_payload = {
+        "today": datetime.now(UTC).strftime("%Y-%m-%d"),
         "context": context,
         "mode": style,
         "geo_focus": geo_focus or "",

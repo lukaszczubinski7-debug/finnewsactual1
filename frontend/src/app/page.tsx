@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import AnalysisPanel from "../components/AnalysisPanel";
 import AuthProfilePanel from "../components/AuthProfilePanel";
 import BriefResult from "../components/BriefResult";
+import Charts from "../components/Charts";
+import Dashboard from "../components/Dashboard";
 import FooterActions from "../components/FooterActions";
 import HeaderBar from "../components/HeaderBar";
 import ThreadDetail from "../components/ThreadDetail";
@@ -67,6 +69,7 @@ export default function Page() {
   const [threadRefreshingId, setThreadRefreshingId] = useState<number | null>(null);
   const [threadRefreshingAll, setThreadRefreshingAll] = useState(false);
   const [threadError, setThreadError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"brief" | "dashboard" | "charts">("brief");
 
   const hasQuestion = useMemo(() => mainQuestion.trim().length > 0, [mainQuestion]);
   const hasProfile = useMemo(() => hasUsefulProfile(preferences), [preferences]);
@@ -437,6 +440,19 @@ export default function Page() {
     </div>
   );
 
+  const tab = (key: "brief" | "dashboard" | "charts"): React.CSSProperties => ({
+    padding: "9px 22px",
+    borderRadius: 999,
+    border: activeTab === key ? "1px solid rgba(80,120,180,0.6)" : "1px solid rgba(161,187,224,0.18)",
+    background: activeTab === key ? "rgba(80,120,180,0.85)" : "transparent",
+    color: activeTab === key ? "#e5f0ff" : "#8ab4f0",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 600,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase" as const,
+  });
+
   return (
     <main
       style={{
@@ -446,7 +462,16 @@ export default function Page() {
           "radial-gradient(circle at top right, rgba(72, 93, 123, 0.2) 0%, transparent 35%), radial-gradient(circle at bottom left, rgba(72, 97, 131, 0.12) 0%, transparent 30%), linear-gradient(180deg, #0a0f16 0%, #05090f 100%)",
       }}
     >
-      {user && token ? (
+      <nav style={{ maxWidth: 1600, margin: "0 auto 20px", display: "flex", gap: 8, borderBottom: "1px solid rgba(186,205,231,0.1)", paddingBottom: 16 }}>
+        <button type="button" style={tab("brief")} onClick={() => setActiveTab("brief")}>Brief</button>
+        <button type="button" style={tab("dashboard")} onClick={() => setActiveTab("dashboard")}>Dashboard</button>
+        <button type="button" style={tab("charts")} onClick={() => setActiveTab("charts")}>Wykresy</button>
+      </nav>
+
+      {activeTab === "dashboard" && <div style={{ maxWidth: 1600, margin: "0 auto" }}><Dashboard /></div>}
+      {activeTab === "charts" && <div style={{ maxWidth: 1600, margin: "0 auto" }}><Charts /></div>}
+
+      {activeTab === "brief" && user && token ? (
         <div
           style={{
             maxWidth: 1600,
@@ -496,11 +521,11 @@ export default function Page() {
             </div>
           )}
         </div>
-      ) : (
+      ) : activeTab === "brief" ? (
         <div style={{ maxWidth: 1180, margin: "0 auto" }}>
           {leftColumn}
         </div>
-      )}
+      ) : null}
     </main>
   );
 }

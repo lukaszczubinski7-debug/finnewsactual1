@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import AnalysisPanel from "../components/AnalysisPanel";
 import AuthProfilePanel from "../components/AuthProfilePanel";
 import BriefResult from "../components/BriefResult";
+import Charts from "../components/Charts";
+import Dashboard from "../components/Dashboard";
 import FooterActions from "../components/FooterActions";
 import HeaderBar from "../components/HeaderBar";
 import ThreadDetail from "../components/ThreadDetail";
@@ -67,6 +69,8 @@ export default function Page() {
   const [threadRefreshingId, setThreadRefreshingId] = useState<number | null>(null);
   const [threadRefreshingAll, setThreadRefreshingAll] = useState(false);
   const [threadError, setThreadError] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState<"brief" | "dashboard" | "charts">("brief");
 
   const hasQuestion = useMemo(() => mainQuestion.trim().length > 0, [mainQuestion]);
   const hasProfile = useMemo(() => hasUsefulProfile(preferences), [preferences]);
@@ -437,6 +441,19 @@ export default function Page() {
     </div>
   );
 
+  const tabBtnStyle = (tab: "brief" | "dashboard" | "charts"): React.CSSProperties => ({
+    padding: "9px 22px",
+    borderRadius: 999,
+    border: activeTab === tab ? "1px solid rgba(80,120,180,0.6)" : "1px solid rgba(161,187,224,0.18)",
+    background: activeTab === tab ? "rgba(80,120,180,0.85)" : "transparent",
+    color: activeTab === tab ? "#e5f0ff" : "#8ab4f0",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 600,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase" as const,
+  });
+
   return (
     <main
       style={{
@@ -446,61 +463,102 @@ export default function Page() {
           "radial-gradient(circle at top right, rgba(72, 93, 123, 0.2) 0%, transparent 35%), radial-gradient(circle at bottom left, rgba(72, 97, 131, 0.12) 0%, transparent 30%), linear-gradient(180deg, #0a0f16 0%, #05090f 100%)",
       }}
     >
-      {user && token ? (
-        <div
-          style={{
-            maxWidth: 1600,
-            margin: "0 auto",
-            display: "grid",
-            gridTemplateColumns: "1fr 340px",
-            gap: 22,
-            alignItems: "start",
-          }}
-        >
-          {leftColumn}
-          <div style={{ position: "sticky", top: 26 }}>
-            <ThreadsPanel
-              threads={threads}
-              loading={threadLoading}
-              creating={threadCreating}
-              refreshingAll={threadRefreshingAll}
-              refreshingId={threadRefreshingId}
-              error={threadError}
-              selectedId={selectedThread?.id ?? null}
-              onSelect={(thread) => setSelectedThread(thread)}
-              onCreate={handleCreateThread}
-              onRefresh={handleRefreshThread}
-              onRefreshAll={handleRefreshAll}
-              onDelete={handleDeleteThread}
-            />
-          </div>
+      {/* Tab navigation */}
+      <nav
+        style={{
+          maxWidth: 1600,
+          margin: "0 auto 20px",
+          display: "flex",
+          gap: 8,
+          borderBottom: "1px solid rgba(186,205,231,0.1)",
+          paddingBottom: 16,
+        }}
+      >
+        <button type="button" style={tabBtnStyle("brief")} onClick={() => setActiveTab("brief")}>
+          Brief
+        </button>
+        <button type="button" style={tabBtnStyle("dashboard")} onClick={() => setActiveTab("dashboard")}>
+          Dashboard
+        </button>
+        <button type="button" style={tabBtnStyle("charts")} onClick={() => setActiveTab("charts")}>
+          Wykresy
+        </button>
+      </nav>
 
-          {/* Thread detail modal */}
-          {selectedThread && (
+      {/* Dashboard tab */}
+      {activeTab === "dashboard" && (
+        <div style={{ maxWidth: 1600, margin: "0 auto" }}>
+          <Dashboard />
+        </div>
+      )}
+
+      {/* Charts tab */}
+      {activeTab === "charts" && (
+        <div style={{ maxWidth: 1600, margin: "0 auto" }}>
+          <Charts />
+        </div>
+      )}
+
+      {/* Brief tab */}
+      {activeTab === "brief" && (
+        <>
+          {user && token ? (
             <div
               style={{
-                position: "fixed",
-                inset: 0,
-                zIndex: 100,
-                background: "rgba(5,9,15,0.82)",
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "center",
-                padding: "40px 18px 40px",
-                overflowY: "auto",
+                maxWidth: 1600,
+                margin: "0 auto",
+                display: "grid",
+                gridTemplateColumns: "1fr 340px",
+                gap: 22,
+                alignItems: "start",
               }}
-              onClick={(e) => { if (e.target === e.currentTarget) setSelectedThread(null); }}
             >
-              <div style={{ width: "100%", maxWidth: 860 }}>
-                <ThreadDetail thread={selectedThread} onClose={() => setSelectedThread(null)} />
+              {leftColumn}
+              <div style={{ position: "sticky", top: 26 }}>
+                <ThreadsPanel
+                  threads={threads}
+                  loading={threadLoading}
+                  creating={threadCreating}
+                  refreshingAll={threadRefreshingAll}
+                  refreshingId={threadRefreshingId}
+                  error={threadError}
+                  selectedId={selectedThread?.id ?? null}
+                  onSelect={(thread) => setSelectedThread(thread)}
+                  onCreate={handleCreateThread}
+                  onRefresh={handleRefreshThread}
+                  onRefreshAll={handleRefreshAll}
+                  onDelete={handleDeleteThread}
+                />
               </div>
+
+              {/* Thread detail modal */}
+              {selectedThread && (
+                <div
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: 100,
+                    background: "rgba(5,9,15,0.82)",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "center",
+                    padding: "40px 18px 40px",
+                    overflowY: "auto",
+                  }}
+                  onClick={(e) => { if (e.target === e.currentTarget) setSelectedThread(null); }}
+                >
+                  <div style={{ width: "100%", maxWidth: 860 }}>
+                    <ThreadDetail thread={selectedThread} onClose={() => setSelectedThread(null)} />
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+              {leftColumn}
             </div>
           )}
-        </div>
-      ) : (
-        <div style={{ maxWidth: 1180, margin: "0 auto" }}>
-          {leftColumn}
-        </div>
+        </>
       )}
     </main>
   );

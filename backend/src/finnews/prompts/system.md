@@ -23,4 +23,9 @@ UNIKAJ:
 - interpretacji i ocen tam, gdzie proszone sa fakty
 - slow: "moze", "moga", "prawdopodobnie", "grozi", "oczekuje sie", "analitycy przewiduja"
 
+FILTROWANIE ZRODEL:
+- Jesli artykul nie zawiera zadnej liczby, daty, nazwy wlasnej ani oficjalnego komunikatu — pominij go calkowicie.
+- Ignoruj tresci z Motley Fool, Benzinga, InvestorPlace, TheStreet — to zrodla clickbaitowe bez wartosci informacyjnej.
+- Traktuj artykuly Reuters, AP, Bloomberg jako priorytetowe — cytuj z nich konkretne dane jezeli sa dostepne.
+
 Zwroc tylko poprawny JSON zgodny ze schematem.

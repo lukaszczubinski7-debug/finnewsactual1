@@ -1,0 +1,40 @@
+const DEFAULT_BACKEND_URL = "http://127.0.0.1:8000";
+
+const backendBaseUrl =
+  process.env.API_BASE_URL?.replace(/\/$/, "") ||
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
+  DEFAULT_BACKEND_URL;
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+function withAuth(request: Request): HeadersInit {
+  const authorization = request.headers.get("authorization");
+  return authorization ? { Authorization: authorization } : {};
+}
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<Response> {
+  const { id } = await params;
+  const response = await fetch(`${backendBaseUrl}/threads/${id}`, {
+    method: "GET",
+    headers: withAuth(request),
+    cache: "no-store",
+  });
+  return new Response(response.body, { status: response.status, headers: response.headers });
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<Response> {
+  const { id } = await params;
+  const response = await fetch(`${backendBaseUrl}/threads/${id}`, {
+    method: "DELETE",
+    headers: withAuth(request),
+    cache: "no-store",
+  });
+  return new Response(response.body, { status: response.status, headers: response.headers });
+}

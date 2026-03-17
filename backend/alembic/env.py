@@ -14,7 +14,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
 from finnews.db.base import Base
-from finnews.models import User, UserPreference  # noqa: F401
+from finnews.models import User, UserPreference, Thread  # noqa: F401
 from finnews.settings import settings
 
 

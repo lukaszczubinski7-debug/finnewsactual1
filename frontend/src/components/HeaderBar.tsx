@@ -31,18 +31,8 @@ export default function HeaderBar() {
         <h1 className={styles.headerTitle}>Geopolityczny Brief Operacyjny</h1>
         <p className={styles.headerSub}>Panel strategiczny / tryb terminala</p>
       </div>
-      <div className={styles.statusGrid}>
-        <div className={styles.clockLine}>
-          {hudDate} | {clock}
-        </div>
-        <div className={styles.tickerRow}>
-          <span className={styles.ticker}>
-            USD/PLN 4.33 <span className={styles.tickerUp}>▲0.02</span>
-          </span>
-          <span className={styles.ticker}>
-            WTI OIL 97.45 <span className={styles.tickerDown}>▼0.31</span>
-          </span>
-        </div>
+      <div className={styles.clockLine}>
+        {hudDate} | {clock}
       </div>
     </header>
   );

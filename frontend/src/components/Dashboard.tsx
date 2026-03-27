@@ -46,11 +46,13 @@ function fmtPct(n: number | null): string {
 
 // ── Selector ──────────────────────────────────────────────────────────────────
 
-function Selector({ categories, usedTickers, onSelect, onClose }: {
+function Selector({ categories, usedTickers, onSelect, onSelectGroup, onClose, groupMode }: {
   categories: MarketCategory[];
   usedTickers: Set<string>;
-  onSelect: (ticker: string) => void;
+  onSelect?: (ticker: string) => void;
+  onSelectGroup?: (cat: MarketCategory) => void;
   onClose: () => void;
+  groupMode?: boolean;
 }) {
   const [cat, setCat] = useState<MarketCategory | null>(null);
 
@@ -73,7 +75,7 @@ function Selector({ categories, usedTickers, onSelect, onClose }: {
             )}
             <span style={{ color: "#d0e4ff", fontSize: 12, fontWeight: 700,
               letterSpacing: "0.12em", textTransform: "uppercase" }}>
-              {cat ? cat.name : "Wybierz kategorię"}
+              {groupMode ? "Dodaj grupę" : cat ? cat.name : "Wybierz kategorię"}
             </span>
           </div>
           <button onClick={onClose} style={{ background: "none",
@@ -81,12 +83,30 @@ function Selector({ categories, usedTickers, onSelect, onClose }: {
             color: "#7a9abf", cursor: "pointer", padding: "3px 9px", fontSize: 11 }}>✕</button>
         </div>
         <div style={{ padding: "12px 16px 16px", display: "grid", gap: 6, maxHeight: 420, overflowY: "auto" }}>
-          {!cat && categories.length === 0 && (
+          {categories.length === 0 && (
             <p style={{ color: "#3a5a80", fontSize: 12, textAlign: "center", padding: "20px 0", margin: 0 }}>
               Ładowanie kategorii... sprawdź czy backend działa.
             </p>
           )}
-          {!cat && categories.length > 0 ? (
+          {groupMode ? (
+            categories.map((c) => {
+              const available = c.instruments.filter((i) => !usedTickers.has(i.ticker)).length;
+              return (
+                <button key={c.name} disabled={available === 0} onClick={() => onSelectGroup?.(c)} style={{
+                  border: `1px solid ${available === 0 ? "rgba(40,70,110,0.3)" : "rgba(100,140,200,0.22)"}`,
+                  borderRadius: 9, padding: "10px 13px",
+                  background: available === 0 ? "rgba(14,22,34,0.4)" : "rgba(16,26,42,0.7)",
+                  color: available === 0 ? "#2a4060" : "#c0d8f4",
+                  fontSize: 12, fontWeight: 600, cursor: available === 0 ? "not-allowed" : "pointer",
+                  textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  {c.name}
+                  <span style={{ color: available === 0 ? "#1e3050" : "#3a6090", fontSize: 11 }}>
+                    {available === 0 ? "dodano" : `+${available}`}
+                  </span>
+                </button>
+              );
+            })
+          ) : !cat && categories.length > 0 ? (
             categories.map((c) => (
               <button key={c.name} onClick={() => setCat(c)} style={{
                 border: "1px solid rgba(100,140,200,0.22)", borderRadius: 9,
@@ -97,7 +117,7 @@ function Selector({ categories, usedTickers, onSelect, onClose }: {
                 <span style={{ color: "#3a5a80", fontSize: 11 }}>{c.instruments.length} →</span>
               </button>
             ))
-          ) : cat ? (
+          ) : cat && !groupMode ? (
             cat.instruments.map((inst) => {
               const used = usedTickers.has(inst.ticker);
               return (
@@ -170,25 +190,30 @@ function QuoteTile({ quote, onRemove }: { quote: MarketQuote; onRemove: () => vo
   );
 }
 
-function EmptyTile({ onAdd }: { onAdd: () => void }) {
+function EmptyTile({ onAddTicker, onAddGroup }: { onAddTicker: () => void; onAddGroup: () => void }) {
+  const btnStyle = (hover: string): React.CSSProperties => ({
+    flex: 1, padding: "10px 6px", background: "rgba(25,40,65,0.6)",
+    border: "1px solid rgba(100,140,200,0.2)", borderRadius: 8,
+    cursor: "pointer", display: "flex", flexDirection: "column",
+    alignItems: "center", justifyContent: "center", gap: 5,
+    color: "rgba(130,170,220,0.65)", transition: "all 0.15s",
+  });
+
   return (
-    <button onClick={onAdd} style={{
-      padding: "16px 18px", background: "rgba(30,50,80,0.25)",
-      border: "none", cursor: "pointer",
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      gap: 8, minHeight: 110, width: "100%",
-      color: "rgba(140,180,230,0.6)", transition: "background 0.15s, color 0.15s" }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background = "rgba(50,80,130,0.4)";
-        (e.currentTarget as HTMLButtonElement).style.color = "rgba(180,210,255,0.9)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background = "rgba(30,50,80,0.25)";
-        (e.currentTarget as HTMLButtonElement).style.color = "rgba(140,180,230,0.6)";
-      }}>
-      <span style={{ fontSize: 28, lineHeight: 1, fontWeight: 300 }}>+</span>
-      <span style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Dodaj</span>
-    </button>
+    <div style={{ padding: "12px 14px", display: "flex", gap: 8, minHeight: 110, alignItems: "stretch" }}>
+      <button style={btnStyle("")} onClick={onAddTicker}
+        onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(40,65,110,0.7)"; b.style.color = "rgba(180,215,255,0.9)"; b.style.borderColor = "rgba(140,180,230,0.4)"; }}
+        onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(25,40,65,0.6)"; b.style.color = "rgba(130,170,220,0.65)"; b.style.borderColor = "rgba(100,140,200,0.2)"; }}>
+        <span style={{ fontSize: 20, lineHeight: 1, fontWeight: 300 }}>+</span>
+        <span style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", textAlign: "center" }}>Dodaj ticker</span>
+      </button>
+      <button style={btnStyle("")} onClick={onAddGroup}
+        onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(40,65,110,0.7)"; b.style.color = "rgba(180,215,255,0.9)"; b.style.borderColor = "rgba(140,180,230,0.4)"; }}
+        onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(25,40,65,0.6)"; b.style.color = "rgba(130,170,220,0.65)"; b.style.borderColor = "rgba(100,140,200,0.2)"; }}>
+        <span style={{ fontSize: 20, lineHeight: 1, fontWeight: 300 }}>⊞</span>
+        <span style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", textAlign: "center" }}>Dodaj grupę</span>
+      </button>
+    </div>
   );
 }
 
@@ -200,7 +225,7 @@ export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>(() => loadSaved());
   const [quotes, setQuotes] = useState<Map<string, MarketQuote>>(new Map());
   const [categories, setCategories] = useState<MarketCategory[]>([]);
-  const [showSelector, setShowSelector] = useState(false);
+  const [selectorMode, setSelectorMode] = useState<"ticker" | "group" | null>(null);
 
   const fetchQuotes = useCallback(async (t: string[]) => {
     if (!t.length) return;
@@ -236,8 +261,19 @@ export default function Dashboard() {
     const next = [...tickers, ticker];
     setTickers(next);
     saveTickers(next);
-    setShowSelector(false);
+    setSelectorMode(null);
     void fetchQuotes([ticker]);
+  };
+
+  const handleAddGroup = (cat: MarketCategory) => {
+    const used = new Set(tickers);
+    const toAdd = cat.instruments.map((i) => i.ticker).filter((t) => !used.has(t));
+    if (!toAdd.length) return;
+    const next = [...tickers, ...toAdd];
+    setTickers(next);
+    saveTickers(next);
+    setSelectorMode(null);
+    void fetchQuotes(toAdd);
   };
 
   const handleRemove = (ticker: string) => {
@@ -305,7 +341,7 @@ export default function Dashboard() {
                   </div>
                 )
               ) : i === tickers.length ? (
-                <EmptyTile onAdd={() => setShowSelector(true)} />
+                <EmptyTile onAddTicker={() => setSelectorMode("ticker")} onAddGroup={() => setSelectorMode("group")} />
               ) : (
                 <div style={{ minHeight: 110 }} />
               )}
@@ -314,12 +350,21 @@ export default function Dashboard() {
         })}
       </div>
 
-      {showSelector && (
+      {selectorMode === "ticker" && (
         <Selector
           categories={categories}
           usedTickers={new Set(tickers)}
           onSelect={handleAdd}
-          onClose={() => setShowSelector(false)}
+          onClose={() => setSelectorMode(null)}
+        />
+      )}
+      {selectorMode === "group" && (
+        <Selector
+          categories={categories}
+          usedTickers={new Set(tickers)}
+          groupMode
+          onSelectGroup={handleAddGroup}
+          onClose={() => setSelectorMode(null)}
         />
       )}
     </div>

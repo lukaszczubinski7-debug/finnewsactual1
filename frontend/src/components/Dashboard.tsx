@@ -56,8 +56,8 @@ function TickerRow({ quote, ticker, onRemove }: {
   return (
     <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ display: "flex", alignItems: "center", padding: "7px 10px",
-        borderBottom: "1px solid rgba(80,120,180,0.08)",
-        background: hov ? "rgba(30,50,90,0.25)" : "transparent", gap: 8 }}>
+        borderBottom: "1px solid rgba(100,140,200,0.06)",
+        background: hov ? "rgba(255,255,255,0.03)" : "transparent", gap: 8 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: "#c0d4f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {quote?.name ?? ticker}
@@ -182,14 +182,14 @@ function GroupCard({ group, quotes, allTickers, categories, onAddTicker, onRemov
   const [renameVal, setRenameVal] = useState(group.name);
 
   return (
-    <div style={{ background: isDragging ? "rgba(20,36,70,0.95)" : "rgba(10,18,32,0.75)",
-      border: `1px solid ${isDragging ? "rgba(80,130,220,0.5)" : "rgba(80,120,190,0.18)"}`,
-      borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column",
-      boxShadow: isDragging ? "0 8px 32px rgba(0,0,0,0.6)" : "none",
+    <div style={{ background: isDragging ? "rgba(20,36,70,0.6)" : "rgba(255,255,255,0.025)",
+      border: `1px solid ${isDragging ? "rgba(80,130,220,0.4)" : "rgba(120,160,210,0.1)"}`,
+      borderRadius: 10, overflow: "hidden", display: "flex", flexDirection: "column",
+      boxShadow: isDragging ? "0 8px 32px rgba(0,0,0,0.5)" : "0 1px 8px rgba(0,0,0,0.15)",
       transition: "box-shadow 0.15s, border-color 0.15s" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 10px",
-        borderBottom: "1px solid rgba(80,120,190,0.12)", background: "rgba(14,24,44,0.5)", cursor: "grab" }}>
+        borderBottom: "1px solid rgba(100,140,200,0.08)", background: "rgba(255,255,255,0.02)", cursor: "grab" }}>
         <span style={{ color: "#1e3555", fontSize: 14, marginRight: 2, userSelect: "none" }}>⠿</span>
         {renaming ? (
           <input autoFocus value={renameVal} onChange={(e) => setRenameVal(e.target.value)}

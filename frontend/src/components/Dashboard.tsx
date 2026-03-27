@@ -41,7 +41,7 @@ function fmtPct(n: number | null): string {
   return `${sign}${n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
-// ── Selector ─────────────────────────────────────────────────────────────────
+// ── Selector ──────────────────────────────────────────────────────────────────
 
 function Selector({ categories, usedTickers, onSelect, onClose }: {
   categories: MarketCategory[];
@@ -112,54 +112,67 @@ function Selector({ categories, usedTickers, onSelect, onClose }: {
   );
 }
 
-// ── Row ───────────────────────────────────────────────────────────────────────
+// ── Tile ──────────────────────────────────────────────────────────────────────
 
-function QuoteRow({ quote, onRemove }: { quote: MarketQuote; onRemove: () => void }) {
+function QuoteTile({ quote, onRemove }: { quote: MarketQuote; onRemove: () => void }) {
   const pos = (quote.change ?? 0) >= 0;
   const neutral = quote.change === null;
   const clr = neutral ? "#7a9abf" : pos ? "#34d399" : "#f87171";
+  const bgClr = neutral ? "rgba(80,110,150,0.1)" : pos ? "rgba(52,211,153,0.09)" : "rgba(248,113,113,0.09)";
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto 28px",
-      alignItems: "center", gap: "0 16px",
-      padding: "10px 14px", borderBottom: "1px solid rgba(140,170,210,0.08)" }}>
-      <div style={{ minWidth: 0 }}>
-        <span style={{ color: "#d0e4ff", fontSize: 13, fontWeight: 600,
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
-          {quote.name}
-        </span>
-        <span style={{ color: "#3a5a80", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-          {quote.ticker}
-        </span>
-      </div>
-      <span style={{ color: "#e0eeff", fontSize: 15, fontWeight: 700,
-        fontVariantNumeric: "tabular-nums", textAlign: "right", whiteSpace: "nowrap" }}>
-        {fmtPrice(quote.price)}
-        {quote.currency && quote.currency !== "USD" &&
-          <span style={{ fontSize: 10, color: "#3a5a80", marginLeft: 4 }}>{quote.currency}</span>}
-      </span>
-      <span style={{ color: clr, fontSize: 12, fontVariantNumeric: "tabular-nums",
-        textAlign: "right", whiteSpace: "nowrap" }}>
-        {fmtChange(quote.change)}
-      </span>
-      <span style={{ color: clr, fontSize: 12, fontWeight: 600,
-        fontVariantNumeric: "tabular-nums", textAlign: "right", whiteSpace: "nowrap",
-        background: neutral ? "rgba(80,110,150,0.1)" : pos ? "rgba(52,211,153,0.09)" : "rgba(248,113,113,0.09)",
-        borderRadius: 5, padding: "2px 6px" }}>
-        {fmtPct(quote.change_pct)}
-      </span>
-      <button onClick={onRemove} style={{ background: "none", border: "none",
-        color: "rgba(80,110,150,0.35)", cursor: "pointer", fontSize: 12,
-        padding: 0, textAlign: "center", lineHeight: 1 }}
+    <div style={{ padding: "16px 18px", position: "relative" }}>
+      <button onClick={onRemove} style={{
+        position: "absolute", top: 10, right: 10,
+        background: "none", border: "none", color: "rgba(70,100,140,0.3)",
+        cursor: "pointer", fontSize: 11, padding: 2, lineHeight: 1 }}
         onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(80,110,150,0.35)"; }}>
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(70,100,140,0.3)"; }}>
         ✕
       </button>
+      <p style={{ margin: "0 0 2px", color: "#c8dff8", fontSize: 13, fontWeight: 700,
+        paddingRight: 18, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {quote.name}
+      </p>
+      <p style={{ margin: "0 0 10px", color: "#2a4a70", fontSize: 10,
+        letterSpacing: "0.1em", textTransform: "uppercase" }}>
+        {quote.ticker}{quote.currency && quote.currency !== "USD" ? ` · ${quote.currency}` : ""}
+      </p>
+      <p style={{ margin: "0 0 6px", color: "#e0eeff", fontSize: 22, fontWeight: 700,
+        fontVariantNumeric: "tabular-nums", letterSpacing: "0.01em" }}>
+        {fmtPrice(quote.price)}
+      </p>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ color: clr, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
+          {fmtChange(quote.change)}
+        </span>
+        <span style={{ background: bgClr, color: clr, borderRadius: 5,
+          padding: "2px 7px", fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+          {fmtPct(quote.change_pct)}
+        </span>
+      </div>
     </div>
   );
 }
 
+function EmptyTile({ onAdd }: { onAdd: () => void }) {
+  return (
+    <button onClick={onAdd} style={{
+      padding: "16px 18px", background: "none", border: "none", cursor: "pointer",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      gap: 6, minHeight: 110, width: "100%",
+      color: "rgba(70,110,160,0.3)", transition: "color 0.15s" }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(120,170,230,0.6)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(70,110,160,0.3)"; }}>
+      <span style={{ fontSize: 22, lineHeight: 1 }}>+</span>
+      <span style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>Dodaj</span>
+    </button>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
+
+const COLS = 4;
 
 export default function Dashboard() {
   const [tickers, setTickers] = useState<string[]>(() => loadSaved());
@@ -204,50 +217,49 @@ export default function Dashboard() {
     saveTickers(next);
   };
 
+  // Build cells: filled tiles + one empty "add" tile
+  const cells: Array<{ type: "quote"; ticker: string } | { type: "empty" }> = [
+    ...tickers.map((t) => ({ type: "quote" as const, ticker: t })),
+    { type: "empty" as const },
+  ];
+
+  // Pad to full row
+  while (cells.length % COLS !== 0) cells.push({ type: "empty" as const });
+
   return (
     <div style={{ paddingBottom: 40 }}>
-      <div style={{ border: "1px solid rgba(140,170,210,0.18)", borderRadius: 14,
+      <div style={{
+        border: "1px solid rgba(140,170,210,0.18)", borderRadius: 14, overflow: "hidden",
         background: "linear-gradient(180deg, rgba(14,22,34,0.98), rgba(9,15,24,0.98))",
-        overflow: "hidden" }}>
+        display: "grid",
+        gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+      }}>
+        {cells.map((cell, i) => {
+          const col = i % COLS;
+          const row = Math.floor(i / COLS);
+          const totalRows = Math.ceil(cells.length / COLS);
+          const borderRight = col < COLS - 1 ? "1px solid rgba(140,170,210,0.1)" : "none";
+          const borderBottom = row < totalRows - 1 ? "1px solid rgba(140,170,210,0.1)" : "none";
 
-        {/* Column headers */}
-        {tickers.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto 28px",
-            gap: "0 16px", padding: "8px 14px",
-            borderBottom: "1px solid rgba(140,170,210,0.14)",
-            background: "rgba(10,16,26,0.6)" }}>
-            <span style={{ color: "#2a4a6a", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Instrument</span>
-            <span style={{ color: "#2a4a6a", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", textAlign: "right" }}>Cena</span>
-            <span style={{ color: "#2a4a6a", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", textAlign: "right" }}>Zmiana</span>
-            <span style={{ color: "#2a4a6a", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", textAlign: "right" }}>%</span>
-            <span />
-          </div>
-        )}
-
-        {/* Rows */}
-        {tickers.map((ticker) => {
-          const q = quotes.get(ticker);
-          return q ? (
-            <QuoteRow key={ticker} quote={q} onRemove={() => handleRemove(ticker)} />
-          ) : (
-            <div key={ticker} style={{ padding: "10px 14px", borderBottom: "1px solid rgba(140,170,210,0.08)",
-              color: "#2a4060", fontSize: 12 }}>
-              {ticker} <span style={{ fontSize: 10 }}>ładowanie...</span>
+          return (
+            <div key={i} style={{ borderRight, borderBottom }}>
+              {cell.type === "quote" ? (
+                quotes.get(cell.ticker) ? (
+                  <QuoteTile quote={quotes.get(cell.ticker)!} onRemove={() => handleRemove(cell.ticker)} />
+                ) : (
+                  <div style={{ padding: "16px 18px", color: "#2a4060", fontSize: 12, minHeight: 110,
+                    display: "flex", alignItems: "center" }}>
+                    {cell.ticker}…
+                  </div>
+                )
+              ) : i === tickers.length ? (
+                <EmptyTile onAdd={() => setShowSelector(true)} />
+              ) : (
+                <div style={{ minHeight: 110 }} />
+              )}
             </div>
           );
         })}
-
-        {/* Add row */}
-        <button onClick={() => setShowSelector(true)} style={{
-          width: "100%", padding: "11px 14px", background: "none",
-          border: "none", borderTop: tickers.length > 0 ? "1px dashed rgba(80,120,170,0.18)" : "none",
-          cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
-          color: "rgba(80,130,190,0.45)", fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase" }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(120,170,230,0.7)"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(80,130,190,0.45)"; }}>
-          <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
-          <span>Dodaj instrument</span>
-        </button>
       </div>
 
       {showSelector && (

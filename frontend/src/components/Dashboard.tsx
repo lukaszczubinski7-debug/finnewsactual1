@@ -163,14 +163,21 @@ function QuoteTile({ quote, onRemove }: { quote: MarketQuote; onRemove: () => vo
 function EmptyTile({ onAdd }: { onAdd: () => void }) {
   return (
     <button onClick={onAdd} style={{
-      padding: "16px 18px", background: "none", border: "none", cursor: "pointer",
+      padding: "16px 18px", background: "rgba(30,50,80,0.25)",
+      border: "none", cursor: "pointer",
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      gap: 6, minHeight: 110, width: "100%",
-      color: "rgba(70,110,160,0.3)", transition: "color 0.15s" }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(120,170,230,0.6)"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(70,110,160,0.3)"; }}>
-      <span style={{ fontSize: 22, lineHeight: 1 }}>+</span>
-      <span style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase" }}>Dodaj</span>
+      gap: 8, minHeight: 110, width: "100%",
+      color: "rgba(140,180,230,0.6)", transition: "background 0.15s, color 0.15s" }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = "rgba(50,80,130,0.4)";
+        (e.currentTarget as HTMLButtonElement).style.color = "rgba(180,210,255,0.9)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = "rgba(30,50,80,0.25)";
+        (e.currentTarget as HTMLButtonElement).style.color = "rgba(140,180,230,0.6)";
+      }}>
+      <span style={{ fontSize: 28, lineHeight: 1, fontWeight: 300 }}>+</span>
+      <span style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Dodaj</span>
     </button>
   );
 }

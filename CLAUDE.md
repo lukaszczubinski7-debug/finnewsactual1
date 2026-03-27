@@ -7,16 +7,16 @@
 ## Uruchomienie lokalne
 
 ```powershell
-.\dev.ps1
+cd C:\Users\Administrator\finnewsactual1\backend; uv run alembic upgrade head; cd C:\Users\Administrator\finnewsactual1; .\dev.ps1
 ```
 
-Otwiera dwa okna PowerShell: backend na porcie 8000 i frontend na porcie 3000.
+Najpierw uruchamia migracje Alembic, potem otwiera dwa okna PowerShell: backend na porcie 8000 i frontend na porcie 3000.
 
 - Frontend: http://localhost:3000
 - Backend API: http://127.0.0.1:8000
 - Docs (Swagger): http://127.0.0.1:8000/docs
 
-**Nigdy nie używaj `.\start.ps1`** — jedyna poprawna komenda to `.\dev.ps1`.
+**Nigdy nie używaj `.\start.ps1`** — jedyna poprawna komenda startowa to powyższa.
 
 ---
 

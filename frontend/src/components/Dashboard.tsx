@@ -268,6 +268,7 @@ export default function Dashboard() {
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const dragSrc = useRef<number | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setGroups(loadGroups());
@@ -298,18 +299,30 @@ export default function Dashboard() {
 
   const update = (next: DashGroup[]) => { setGroups(next); saveGroups(next); };
 
-  // Drag-and-drop reorder
+  // Drag-and-drop reorder (grid-level — handles both horizontal and vertical)
   const handleDragStart = (i: number) => { dragSrc.current = i; };
-  const handleDragOver = (e: React.DragEvent, i: number) => {
+  const handleDragEnd = () => { dragSrc.current = null; };
+
+  const handleGridDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (dragSrc.current === null || dragSrc.current === i) return;
+    if (dragSrc.current === null || !gridRef.current) return;
+    const cells = Array.from(gridRef.current.children) as HTMLElement[];
+    let closest = -1;
+    let closestDist = Infinity;
+    cells.forEach((cell, i) => {
+      const rect = cell.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
+      if (dist < closestDist) { closestDist = dist; closest = i; }
+    });
+    if (closest === -1 || closest === dragSrc.current) return;
     const next = [...groups];
     const [moved] = next.splice(dragSrc.current, 1);
-    next.splice(i, 0, moved);
-    dragSrc.current = i;
+    next.splice(closest, 0, moved);
+    dragSrc.current = closest;
     update(next);
   };
-  const handleDragEnd = () => { dragSrc.current = null; };
 
   return (
     <div style={{ padding: "0 4px" }}>
@@ -329,12 +342,12 @@ export default function Dashboard() {
       )}
 
       {/* Groups grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14, marginBottom: 16 }}>
+      <div ref={gridRef} onDragOver={handleGridDragOver}
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14, marginBottom: 16 }}>
         {groups.map((group, i) => (
           <div key={group.id}
             draggable
             onDragStart={() => handleDragStart(i)}
-            onDragOver={(e) => handleDragOver(e, i)}
             onDragEnd={handleDragEnd}
             style={{ cursor: "default" }}>
             <GroupCard

@@ -10,7 +10,10 @@ const REFRESH_MS = 60_000;
 function loadSaved(): string[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as string[];
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter((t): t is string => typeof t === "string" && t.length > 0);
+    }
   } catch {}
   return [];
 }
@@ -245,8 +248,26 @@ export default function Dashboard() {
   // Pad to full row
   while (cells.length % COLS !== 0) cells.push({ type: "empty" as const });
 
+  const handleClearAll = () => {
+    setTickers([]);
+    saveTickers([]);
+    setQuotes(new Map());
+  };
+
   return (
     <div style={{ paddingBottom: 40 }}>
+      {tickers.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+          <button onClick={handleClearAll} style={{
+            background: "none", border: "1px solid rgba(200,80,80,0.3)", borderRadius: 8,
+            color: "rgba(200,100,100,0.6)", cursor: "pointer", fontSize: 11,
+            padding: "4px 12px", letterSpacing: "0.08em", textTransform: "uppercase" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(248,113,113,0.5)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(200,100,100,0.6)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(200,80,80,0.3)"; }}>
+            Wyczyść wszystko
+          </button>
+        </div>
+      )}
       <div style={{
         border: "1px solid rgba(140,170,210,0.18)", borderRadius: 14, overflow: "hidden",
         background: "linear-gradient(180deg, rgba(14,22,34,0.98), rgba(9,15,24,0.98))",

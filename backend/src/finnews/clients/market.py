@@ -32,14 +32,6 @@ INSTRUMENTS: list[dict[str, Any]] = [
     {"ticker": "^TYX",      "name": "US 30Y Treasury",   "category": "Obligacje", "default": True},
     {"ticker": "^FVX",      "name": "US 5Y Treasury",    "category": "Obligacje", "default": False},
     {"ticker": "^IRX",      "name": "US 3M T-Bill",      "category": "Obligacje", "default": False},
-    # Surowce
-    {"ticker": "GC=F",      "name": "Złoto (XAU)",       "category": "Surowce",   "default": True},
-    {"ticker": "SI=F",      "name": "Srebro (XAG)",      "category": "Surowce",   "default": False},
-    {"ticker": "CL=F",      "name": "Ropa WTI",          "category": "Surowce",   "default": True},
-    {"ticker": "NG=F",      "name": "Gaz ziemny",        "category": "Surowce",   "default": False},
-    {"ticker": "HG=F",      "name": "Miedź",             "category": "Surowce",   "default": False},
-    {"ticker": "ZC=F",      "name": "Kukurydza",         "category": "Surowce",   "default": False},
-    {"ticker": "ZW=F",      "name": "Pszenica",          "category": "Surowce",   "default": False},
     # Waluty
     {"ticker": "EURUSD=X",  "name": "EUR/USD",           "category": "Waluty",    "default": True},
     {"ticker": "GBPUSD=X",  "name": "GBP/USD",           "category": "Waluty",    "default": False},

@@ -10,17 +10,24 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request): Promise<Response> {
   const body = await request.text();
-  const response = await fetch(`${backendBaseUrl}/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": request.headers.get("content-type") || "application/json; charset=utf-8",
-    },
-    body,
-    cache: "no-store",
-  });
+  try {
+    const response = await fetch(`${backendBaseUrl}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": request.headers.get("content-type") || "application/json; charset=utf-8",
+      },
+      body,
+      cache: "no-store",
+    });
 
-  return new Response(response.body, {
-    status: response.status,
-    headers: response.headers,
-  });
+    return new Response(response.body, {
+      status: response.status,
+      headers: response.headers,
+    });
+  } catch {
+    return new Response(
+      JSON.stringify({ detail: "Backend niedostepny" }),
+      { status: 502, headers: { "Content-Type": "application/json" } },
+    );
+  }
 }

@@ -17,6 +17,7 @@ from finnews.errors import NewsDataParsingError, UpstreamNewsProviderError
 from finnews.services.news_details_service import NewsDetailsService
 from finnews.services.news_list_service import NewsListService
 from finnews.services.selection_service import pick_top
+from finnews.services.web_search_service import WebSearchService
 from finnews.settings import settings
 from finnews.utils.region import normalize_region
 from finnews.utils.text import normalize_text
@@ -43,11 +44,24 @@ CONTEXT_POLAND = "Polska / GPW"
 
 DEFAULT_CONTEXT = CONTEXT_GEOPOLITICS
 DEFAULT_CONTINENTS = ["NA"]
-MAX_CONTINENTS_PER_REQUEST = 3
-HARD_LIST_LIMIT = 20
-FETCH_LIMIT_PER_REGION = 60
-MAX_ITEMS_FOR_SCORING = 300
-MAX_CONCURRENT_REGION_FETCHES = 2
+GEOPOLITICS_EXTRA_CONTINENTS = ["NA", "ME", "EU"]
+MAX_CONTINENTS_PER_REQUEST = 7
+HARD_LIST_LIMIT = 30
+FETCH_LIMIT_PER_REGION = 80
+# Per-continent fetch quotas for parallel news collection.
+# NA (US) gets the largest share — Yahoo Finance US carries Reuters/AP/Bloomberg globally.
+# Other regions supplement with local/regional sources.
+REGION_FETCH_QUOTAS: dict[str, int] = {
+    "NA": 30,
+    "EU": 20,
+    "ME": 15,
+    "AS": 15,
+    "SA": 8,
+    "AF": 6,
+    "OC": 6,
+}
+MAX_ITEMS_FOR_SCORING = 400
+MAX_CONCURRENT_REGION_FETCHES = 3
 CACHE_TTL_SECONDS = 300
 INTERNAL_SELECT_K = settings.llm_top_k
 SELECT_K_MIN = 5
@@ -64,7 +78,9 @@ PROMPT_LONG = "extended.md"
 PROMPT_SYSTEM = "system.md"
 PROMPT_SCHEMA = "json_schema.md"
 PROMPT_FALLBACK = "fallback.md"
+PROMPT_CRITIC = "critic.md"
 QUALITY_SCORE_THRESHOLD = 75
+MAX_CRITIC_LOOPS = 2
 DEBUG_WORDING_BLOCKLIST = (
     "fallback",
     "upstream",
@@ -76,6 +92,15 @@ DEBUG_WORDING_BLOCKLIST = (
 EMPTY_GENERALITIES = (
     "sytuacja pozostaje dynamiczna",
     "nalezy obserwowac rozwoj sytuacji",
+    "ocena skupia sie na najbardziej prawdopodobnych implikacjach rynkowych",
+    "scenariusz bazowy:",
+    "pewnosc oceny:",
+    "ryzyko w gore:",
+    "ryzyko w dol:",
+    "fokus analizy:",
+    "skala reakcji aktywow zalezy od tego",
+    "skala reakcji zalezy od potwierdzenia",
+    "kluczowe dla inwestorow pozostaje tempo potwierdzania informacji",
 )
 QUICK_META_PHRASES = (
     "na podstawie dostepnych informacji",
@@ -142,7 +167,7 @@ GENERIC_BLOCK_TITLES = (
 
 CONTINENT_TO_AXESSO_REGIONS: dict[str, list[str]] = {
     "NA": ["US"],
-    "EU": ["GB"],
+    "EU": ["GB", "PL"],
     "AS": ["SG"],
     "ME": ["AE"],
     "SA": ["BR"],
@@ -278,6 +303,32 @@ CONTEXT_KEYWORDS: dict[str, list[str]] = {
 }
 
 TRUSTED_PROVIDER_MARKERS = ("reuters", "associated press", "ap", "bloomberg")
+
+# Sources known for clickbait/filler content on Yahoo Finance feed — penalized in scoring
+CLICKBAIT_PROVIDER_MARKERS = (
+    "motley fool",
+    "benzinga",
+    "investorplace",
+    "24/7 wall st",
+    "247 wall st",
+    "thestreet",
+    "kiplinger",
+    "gobankingrates",
+    "moneywise",
+    "fool.com",
+    "stockanalysis",
+    "smarteranalyst",
+    "zacks",
+)
+
+# Clickbait title patterns — engagement bait without substance
+_CLICKBAIT_TITLE_RE = re.compile(
+    r"\b(should you|here'?s why|need to know|you need to|top \d+ stocks|best \d+ "
+    r"etf|why you should|why you shouldn'?t|this is why|is it too late|will it "
+    r"crash|could soar|could surge|could skyrocket|don'?t miss|massive gains|"
+    r"hidden gem|secret|must.?buy|must.?own)\b",
+    re.IGNORECASE,
+)
 LEGACY_QUERY_TO_CONTEXT = {
     "earnings": CONTEXT_EARNINGS,
     "dividend": CONTEXT_EARNINGS,
@@ -644,11 +695,11 @@ def _freshness_boost(item: dict[str, Any], *, now: datetime | None = None) -> tu
     if age_hours is None:
         return -0.5, "freshness unknown"
     if age_hours < 6:
-        return 3.0, "fresh <6h"
+        return 1.5, "fresh <6h"
     if age_hours < 24:
-        return 2.0, "fresh <24h"
+        return 0.75, "fresh <24h"
     if age_hours < 72:
-        return 1.0, "fresh <72h"
+        return 0.25, "fresh <72h"
     return 0.0, None
 
 
@@ -656,9 +707,24 @@ def _provider_boost(item: dict[str, Any]) -> tuple[int, str | None]:
     provider = normalize_text(item.get("provider") or "").casefold()
     if not provider:
         return 0, None
+    for marker in CLICKBAIT_PROVIDER_MARKERS:
+        if marker in provider:
+            return -3, f"clickbait source: {normalize_text(item.get('provider') or '')}"
     for marker in TRUSTED_PROVIDER_MARKERS:
         if marker in provider:
             return 2, normalize_text(item.get("provider") or "")
+    return 0, None
+
+
+def _title_quality_penalty(item: dict[str, Any]) -> tuple[int, str | None]:
+    """Penalize titles that are engagement bait without hard data."""
+    title = item.get("title") or ""
+    if _CLICKBAIT_TITLE_RE.search(title):
+        return -2, "clickbait title pattern"
+    # Penalize question-only titles (no number, no proper noun signal)
+    stripped = title.strip()
+    if stripped.endswith("?") and not re.search(r"\d", stripped):
+        return -1, "rhetorical question title"
     return 0, None
 
 
@@ -844,7 +910,14 @@ def _context_signals(item: dict[str, Any], *, context: str, geo_focus: str | Non
     provider_score, provider_reason = _provider_boost(item)
     if provider_score:
         score += provider_score
-        reasons.append(provider_reason or "trusted provider")
+        if provider_reason:
+            reasons.append(provider_reason)
+
+    title_penalty, title_reason = _title_quality_penalty(item)
+    if title_penalty:
+        score += title_penalty
+        if title_reason:
+            reasons.append(title_reason)
 
     freshness_score, freshness_reason = _freshness_boost(item, now=now)
     score += freshness_score
@@ -1861,7 +1934,8 @@ def _build_quick_summary(
 
 def _to_brief_items(summary: dict[str, Any], *, style: str, framing: str) -> list[dict[str, str]]:
     min_items, max_items = _item_bounds_for_style(style)
-    incoming = summary.get("items") if isinstance(summary.get("items"), list) else summary.get("blocks")
+    has_items_key = isinstance(summary.get("items"), list)
+    incoming = summary.get("items") if has_items_key else summary.get("blocks")
     if isinstance(incoming, list):
         items: list[dict[str, str]] = []
         for idx, item in enumerate(incoming[:max_items]):
@@ -1871,6 +1945,10 @@ def _to_brief_items(summary: dict[str, Any], *, style: str, framing: str) -> lis
             body = _compress_to_paragraph(str(item.get("body") or ""), min_sentences=2, max_sentences=3)
             if body:
                 items.append({"title": title, "body": body})
+        # If LLM returned new-format items key, never fall through to old-format fallback
+        # (which fills bodies with placeholder text). Return whatever we have (including empty).
+        if has_items_key:
+            return items[:max_items]
         if len(items) >= min_items:
             return items[:max_items]
 
@@ -1994,6 +2072,9 @@ def _normalize_analytical_summary(
         "geopolitical_context": _non_empty_text(base.get("geopolitical_context"), ""),
         "sources": output_sources,
     }
+    # Preserve items from LLM response for standard/extended mode
+    if isinstance(base.get("items"), list):
+        normalized["items"] = base["items"]
     return normalized
 
 
@@ -2100,6 +2181,13 @@ def _normalize_unified_summary(
     if not normalize_text(str(enriched.get("headline") or "")).strip():
         enriched["headline"] = "Krotki briefing geopolityczno-rynkowy"
 
+    # If LLM returned items directly (factual brief template), use them in _to_brief_items.
+    # Treat both populated and empty lists as "LLM used new-format" to avoid falling through
+    # to the old-format fallback path that fills item bodies with dummy placeholder text.
+    raw_items = base.get("items")
+    if isinstance(raw_items, list):
+        enriched["items"] = raw_items
+
     if style == "short":
         quick_user_inputs = [
             normalize_text(query or "").strip(),
@@ -2120,13 +2208,12 @@ def _normalize_unified_summary(
 
     items = _to_brief_items(enriched, style=style, framing=framing)
     if len(items) < 1:
-        while len(items) < 1:
-            items.append(
-                {
-                    "title": "Rynek pozostaje czuly na tempo naplywu nowych informacji",
-                    "body": "Wyceny aktywow zaleza od tego, czy kolejne doniesienia potwierdza konkretne kanaly ryzyka dla energii, FX i sentymentu. Najbardziej prawdopodobny jest scenariusz podwyzszonej zmiennosci do czasu silniejszych sygnalow kierunkowych.",
-                }
-            )
+        items.append(
+            {
+                "title": "Brak danych spelniajacych kryteria jakosciowe",
+                "body": "Dostepne zrodla nie zawieraly informacji z wystarczajaca liczba konkretow (nazwa wlasna, liczba, data, miejsce). Brief nie zostal wygenerowany.",
+            }
+        )
     _, max_items = _item_bounds_for_style(style)
     return {
         "headline": _non_empty_text(enriched.get("headline"), "Krotki briefing geopolityczno-rynkowy"),
@@ -2168,44 +2255,83 @@ def _build_fallback_summary(
     reason: str,
 ) -> dict[str, Any]:
     _ = reason
-    fallback_hint = _load_prompt(PROMPT_FALLBACK).splitlines()[0]
-    focus = geo_focus or "szeroki fokus geopolityczny"
-    question = query or "brak dodatkowego pytania"
-    regions = ", ".join(continents) if continents else "NA"
+    regions = ", ".join(continents) if continents else "wybranych regionach"
+    focus_label = geo_focus or regions
     return {
-        "headline": "Brief geopolityczno-rynkowy",
-        "thesis": f"Temat {focus} pozostaje istotnym czynnikiem wyceny aktywow wrazliwych na ryzyko geopolityczne.",
-        "facts": [
-            f"W centrum uwagi pozostaje {focus}.",
-            f"Horyzont decyzyjny dla rynku: {window_hours}h.",
-            f"Pytanie inwestycyjne: {question}.",
-            f"Najwazniejsze regiony odniesienia: {regions}.",
+        "headline": f"Brak istotnych zdarzen z konkretami w ostatnich {window_hours}h",
+        "mode": _mode_from_style(style),
+        "items": [
+            {
+                "title": "Brak danych spelniajacych kryteria istotnosci",
+                "body": (
+                    f"Zrodla wiadomosci z ostatnich {window_hours} godzin nie zawieraly wydarzen "
+                    f"z wystarczajaca liczba konkretow (nazwy wlasne, liczby, daty, miejsca) "
+                    f"dla regionow: {focus_label}. "
+                    f"Brief nie zostal wygenerowany z powodu braku kwalifikujacych sie informacji."
+                ),
+            }
         ],
-        "analysis": f"{fallback_hint} Najbardziej wrazliwe pozostaja energia, FX i aktywa ryzykowne, a kierunek ruchu wyznacza tempo pojawiania sie nowych sygnalow.",
-        "confidence": {
-            "level": "medium",
-            "reason": "Pewnosc umiarkowana, bo rynek reaguje glownie na kolejne potwierdzenia i skale potencjalnej eskalacji.",
-        },
-        "scenarios": {
-            "base": "Umiarkowana zmiennosc i selektywny risk premium do czasu nowych potwierdzonych informacji.",
-            "upside_risk": "Eskalacja podbija cene energii, umacnia bezpieczne przystanie i zwieksza awersje do ryzyka.",
-            "downside_risk": "Deeskalacja zmniejsza premie geopolityczne i stabilizuje wyceny ryzykownych aktywow.",
-        },
-        "market_impact": [
-            {"asset": "Ropa i gaz", "direction": "mixed", "why": "Wysoka wrazliwosc na sygnaly o eskalacji i logistycznych zakloceniach."},
-            {"asset": "FX (USD i waluty EM)", "direction": "mixed", "why": "Przeplywy risk-on/risk-off moga szybko zmieniac kierunek notowan."},
-            {"asset": "Indeksy akcji", "direction": "unclear", "why": "Reakcja zalezy od nowych potwierdzonych impulsow geopolitycznych."},
-        ],
-        "watchlist": [
-            "Oficjalne komunikaty rzadowe i regulatorow z kluczowych regionow.",
-            "Szybkie zmiany na ropie, gazie i glownych parach FX.",
-            "Informacje o sankcjach, logistyce i bezpieczenstwie szlakow transportowych.",
-            "Ton komunikacji bankow centralnych wobec ryzyk inflacyjnych i wzrostowych.",
-            "Potwierdzenia lub odwolania sygnalow eskalacyjnych przez wiarygodne zrodla.",
-        ],
-        "geopolitical_context": f"Kontekst obejmuje {focus} oraz jego potencjalny wplyw na energie, FX i sentyment globalny.",
         "sources": [],
     }
+
+
+async def _critic_review(
+    brief: dict[str, Any],
+    *,
+    style: str,
+) -> tuple[bool, list[str]]:
+    """LLM krytyk sprawdza brief pod katem zasad konstrukcyjnych.
+    Zwraca (is_valid, lista_problemow)."""
+    llm = LLMClient()
+    critic_system = _load_prompt(PROMPT_CRITIC)
+    payload = {
+        "brief": brief,
+        "style": style,
+    }
+    messages = [
+        {"role": "system", "content": critic_system},
+        {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+    ]
+    raw = await llm.complete(messages, temperature=0.0)
+    try:
+        result = json.loads(raw)
+        valid = bool(result.get("valid", True))
+        issues = [str(issue) for issue in result.get("issues", []) if issue]
+        logger.debug("Critic review: valid=%s, issues=%d", valid, len(issues))
+        return valid, issues
+    except Exception:
+        logger.warning("Critic LLM returned unparseable JSON — skipping correction")
+        return True, []
+
+
+async def _fix_with_critic_feedback(
+    brief: dict[str, Any],
+    issues: list[str],
+    *,
+    base_messages: list[dict[str, str]],
+) -> dict[str, Any]:
+    """LLM fixer poprawia brief na podstawie listy problemow od krytyka.
+    Zwraca poprawiony dict lub oryginalny brief przy bledzie parsowania."""
+    llm = LLMClient()
+    issues_text = "\n".join(f"- {issue}" for issue in issues)
+    fix_instruction = (
+        f"Krytyk wykryl nastepujace problemy w breifie:\n{issues_text}\n\n"
+        "Popraw brief eliminujac WSZYSTKIE wymienione problemy.\n"
+        "Zachowaj te same zrodla i fakty — nie dodawaj ani nie zmyslaj nowych informacji.\n"
+        "Zwroc wylacznie poprawiony JSON, bez markdown."
+    )
+    fix_messages = base_messages + [
+        {"role": "assistant", "content": json.dumps(brief, ensure_ascii=False)},
+        {"role": "user", "content": fix_instruction},
+    ]
+    raw = await llm.complete(fix_messages, temperature=0.0)
+    try:
+        fixed = json.loads(raw)
+        logger.debug("Fixer LLM returned corrected brief")
+        return fixed
+    except Exception:
+        logger.warning("Fixer LLM returned unparseable JSON — keeping previous brief")
+        return brief
 
 
 async def _generate_summary_via_llm(
@@ -2230,6 +2356,7 @@ async def _generate_summary_via_llm(
         ]
     )
     user_payload = {
+        "today": datetime.now(UTC).strftime("%Y-%m-%d"),
         "context": context,
         "mode": style,
         "geo_focus": geo_focus or "",
@@ -2279,16 +2406,48 @@ async def _generate_summary_via_llm(
         normalize_text(preference_context or "").strip(),
         _derived_focus_from_regions(continents),
     ]
-    quick_valid = True
+    # Petla krytyk/fixer: LLM krytyk sprawdza brief, LLM fixer poprawia na podstawie wytkniectych problemow.
+    for attempt in range(MAX_CRITIC_LOOPS):
+        is_valid, issues = await _critic_review(normalized, style=style)
+        if is_valid or not issues:
+            logger.debug("Critic approved brief on attempt %d", attempt + 1)
+            break
+        logger.info(
+            "Critic rejected brief (attempt %d/%d), %d issue(s): %s",
+            attempt + 1,
+            MAX_CRITIC_LOOPS,
+            len(issues),
+            issues,
+        )
+        fixed_raw = await _fix_with_critic_feedback(normalized, issues, base_messages=base_messages)
+        normalized = _normalize_unified_summary(
+            fixed_raw,
+            fallback_message="Ocena skupia sie na najbardziej prawdopodobnych implikacjach rynkowych.",
+            style=style,
+            geo_focus=geo_focus,
+            continents=continents,
+            query=query,
+            preference_context=preference_context,
+        )
+
+    # Fallback dla trybu quick: jesli po petli summary nadal nie przechodzi walidacji,
+    # generujemy deterministyczne podsumowanie z tytulów zrodel.
     if style == "short":
         quick_valid = _validate_quick_summary(
             str(normalized.get("summary") or ""),
             sources=quick_sources,
             user_inputs=quick_user_inputs,
         )
-    quality_score = score_brief_quality(normalized, preference_context=preference_context)
-    if quality_score >= QUALITY_SCORE_THRESHOLD and quick_valid:
-        return normalized
+        if not quick_valid:
+            normalized = {
+                "mode": "quick",
+                "summary": _build_quick_summary(
+                    base=normalized if isinstance(normalized, dict) else {},
+                    sources=quick_sources,
+                    preference_context=preference_context,
+                    user_inputs=quick_user_inputs,
+                ),
+            }
 
     if style == "short":
         improve_instruction = (
@@ -2354,6 +2513,8 @@ class BriefService:
         self.client = AxessoClient()
         self.list_service = NewsListService(self.client)
         self.details_service = NewsDetailsService(self.client)
+        self.web_search_service = WebSearchService()
+        self.llm_client = LLMClient()
         self._brief_cache: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
 
     def _cache_key(
@@ -2407,6 +2568,7 @@ class BriefService:
         *,
         continents: list[str],
         query: str | None,
+        user_query: str | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         # Always fetch from US region — the only one supported by current Axesso plan.
         # US Yahoo Finance carries global news (Reuters, Bloomberg, AP) covering all regions.
@@ -2466,8 +2628,17 @@ class BriefService:
         selected_count = 0
         list_fetch_status = "ok"
         fetch_error_reason = ""
+
+        # For geopolitical context, always include NA+ME+EU to capture global events.
+        # Without this, users selecting only NA get no Middle East / European war news.
+        if normalized_context == CONTEXT_GEOPOLITICS:
+            extra = [c for c in GEOPOLITICS_EXTRA_CONTINENTS if c not in normalized_continents]
+            fetch_continents = normalized_continents + extra
+        else:
+            fetch_continents = normalized_continents
+
         cache_key = self._cache_key(
-            continents=normalized_continents,
+            continents=fetch_continents,
             window_hours=window_hours,
             geo_focus=normalized_geo_focus,
             custom_query=normalized_query,
@@ -2493,6 +2664,15 @@ class BriefService:
         if cached_result is not None:
             return cached_result
 
+        # Extract geo focuses via LLM in parallel with news fetch (adds ~0 latency).
+        # gpt-4.1-nano interprets query + profile → list of concrete geographic/entity terms.
+        geo_focus_task: asyncio.Task[list[str]] = asyncio.create_task(
+            self.llm_client.extract_geo_focuses(
+                query=normalized_query or query,
+                preference_context=normalized_preference_context,
+            )
+        )
+
         try:
             items: list[dict[str, Any]] = []
             try:
@@ -2508,6 +2688,18 @@ class BriefService:
                     request_id or "-",
                     fetch_error_reason,
                 )
+            # Merge LLM-extracted geo focuses into normalized_geo_focus for scoring.
+            try:
+                llm_focuses = await geo_focus_task
+            except Exception as exc:
+                logger.warning("geo_focus_task error: %s", exc)
+                llm_focuses = []
+            if llm_focuses:
+                existing = [normalized_geo_focus] if normalized_geo_focus else []
+                merged = existing + [f for f in llm_focuses if f not in existing]
+                normalized_geo_focus = ", ".join(merged)
+                logger.info("geo_focus llm_extracted=%s final=%r", llm_focuses, normalized_geo_focus)
+
             time_filtered_items = _filter_items_by_window(items, window_hours=window_hours, now=now)
             time_filtered_items = _limit_items_for_scoring(time_filtered_items)
             after_time_filter_count = len(time_filtered_items)
@@ -2558,7 +2750,13 @@ class BriefService:
                     summary_entries = filtered_summary_entries
 
             picked = [entry["item"] for entry in selected_entries]
-            detail_ids = [str(entry["item"]["id"]) for entry in summary_entries if entry["item"].get("id")]
+            # Only fetch Axesso details for native Axesso items — Serper/web items already
+            # have scraped text in summary and their IDs are MD5 hashes Axesso won't recognise.
+            detail_ids = [
+                str(entry["item"]["id"])
+                for entry in summary_entries
+                if entry["item"].get("id") and entry["item"].get("_source") != "serper"
+            ]
             details_by_id: dict[str, dict[str, Any]] = {}
             if detail_ids:
                 details = await self.details_service.fetch_normalized_many(detail_ids)

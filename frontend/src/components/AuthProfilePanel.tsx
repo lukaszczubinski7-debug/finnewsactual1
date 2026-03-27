@@ -171,35 +171,35 @@ export default function AuthProfilePanel({
           {preferenceLoading ? <p className={styles.helper}>Ladowanie preferencji...</p> : null}
           <textarea
             className={styles.textArea}
-            placeholder="search_profile_text"
+            placeholder="Opis profilu inwestora / kontekst wyszukiwania (np. inwestor GPW, skupiam sie na energetyce i FX)"
             value={searchProfileText}
             onChange={(event) => setSearchProfileText(event.target.value)}
           />
           <input
             className={styles.smallInput}
-            placeholder="response_style"
+            placeholder="Styl odpowiedzi (np. krotko i rzeczowo, analitycznie, trader)"
             value={responseStyle}
             onChange={(event) => setResponseStyle(event.target.value)}
           />
           <input
             className={styles.smallInput}
-            placeholder="interested_assets (po przecinku)"
+            placeholder="Interesujace aktywa, po przecinku (np. NVDA, LPP.WA, EUR/USD)"
             value={assets}
             onChange={(event) => setAssets(event.target.value)}
           />
           <input
             className={styles.smallInput}
-            placeholder="interested_regions (po przecinku)"
+            placeholder="Interesujace regiony, po przecinku (np. Europa, Bliski Wschod)"
             value={regions}
             onChange={(event) => setRegions(event.target.value)}
           />
           <input
             className={styles.smallInput}
-            placeholder="interested_topics (po przecinku)"
+            placeholder="Interesujace tematy, po przecinku (np. energia, polityka monetarna, konflikty)"
             value={topics}
             onChange={(event) => setTopics(event.target.value)}
           />
-          <textarea className={styles.textArea} placeholder="notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
+          <textarea className={styles.textArea} placeholder="Dodatkowe notatki / instrukcje dla asystenta" value={notes} onChange={(event) => setNotes(event.target.value)} />
           <div className={styles.miniActions}>
             <button type="submit" className={styles.tinyBtn} disabled={loading}>
               {loading ? "Zapisywanie..." : "Zapisz preferencje"}

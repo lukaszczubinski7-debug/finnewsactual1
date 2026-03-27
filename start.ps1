@@ -1,10 +1,26 @@
-$backendCommand = 'uv run uvicorn finnews.main:app --reload --host 127.0.0.1 --port 8000'
-$frontendCommand = 'npm run dev'
+$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$backendDir = Join-Path $root "backend"
+$frontendDir = Join-Path $root "frontend"
+
+# Migracja DB
+Write-Host ">>> Migracja bazy danych..." -ForegroundColor Cyan
+Push-Location $backendDir
+uv run alembic upgrade head
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "BLAD: Migracja nie powiodla sie." -ForegroundColor Red
+    Pop-Location
+    exit 1
+}
+Pop-Location
+Write-Host "    OK" -ForegroundColor Green
 
 Start-Process powershell `
-  -WorkingDirectory ".\backend" `
-  -ArgumentList "-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $backendCommand
+  -WorkingDirectory $backendDir `
+  -ArgumentList "-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ".\scripts\run_dev.ps1"
 
 Start-Process powershell `
-  -WorkingDirectory ".\frontend" `
-  -ArgumentList "-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $frontendCommand
+  -WorkingDirectory $frontendDir `
+  -ArgumentList "-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "npm run dev"
+
+Write-Host ""
+Write-Host "Frontend: http://localhost:3000" -ForegroundColor Yellow

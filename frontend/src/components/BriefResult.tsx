@@ -87,7 +87,7 @@ function normalizeQuickSummary(text: string): string {
     .filter((sentence) => !isInterpretiveQuickSentence(sentence))
     .slice(0, 3);
   if (sentences.length === 0) {
-    return "W najnowszych depeszach dominuja informacje o wydarzeniach geopolitycznych, komunikatach rzadowych i notowaniach energii.";
+    return "Brak wystarczajacych danych do wygenerowania podsumowania.";
   }
   return sentences.join(" ");
 }
@@ -98,13 +98,7 @@ function normalizeBody(text: string): string {
     .replace(/^\s*[-*\u2022\d.)]+\s*/g, "")
     .trim();
   const sentences = splitSentences(cleaned).slice(0, 3);
-  if (sentences.length === 0) {
-    return "Rynek pozostaje najbardziej wrazliwy na nowe sygnaly, ktore zmieniaja bilans ryzyka dla aktywow.";
-  }
-  if (sentences.length === 1) {
-    sentences.push("Najwazniejsze pozostaje to, czy kolejne informacje zmieniaja implikacje dla energii, FX i indeksow.");
-  }
-  return sentences.join(" ");
+  return sentences.join(" ") || cleaned;
 }
 
 function normalizeMode(value: unknown, style: BriefResponse["style"]): "quick" | "standard" | "extended" {
@@ -138,27 +132,19 @@ function fallbackQuickSummary(result: BriefResponse): string {
 }
 
 function fallbackItems(result: BriefResponse, mode: "standard" | "extended"): BriefItem[] {
-  const geo = result.focus.geo_focus || "kluczowy obszar geopolityczny";
+  const geo = result.focus.geo_focus || "obserwowany region";
   const base: BriefItem[] = [
     {
-      title: "Rynek energii pozostaje glownym nosnikiem premii geopolitycznej",
-      body: normalizeBody(`Wokol tematu ${geo} inwestorzy najpierw wyceniaja ryzyko dla energii i kosztow transportu. To najszybciej przenosi sie na sentyment dla aktywow ryzykownych i defensywnych.`),
+      title: "Brak danych spelniajacych kryteria jakosciowe",
+      body: `Zrodla wiadomosci dla regionu ${geo} nie zawieraly wystarczajacej liczby konkretow (nazwy wlasne, liczby, daty, miejsca). Brief nie zostal wygenerowany.`,
     },
     {
-      title: "Skala reakcji aktywow zalezy od twardych sygnalow eskalacji",
-      body: normalizeBody("Sama retoryka czesto podnosi zmiennosc, ale trwalszy ruch pojawia sie po potwierdzonych decyzjach lub zdarzeniach operacyjnych. Najwrazliwsze pozostaja instrumenty powiazane z energia, FX i awersja do ryzyka."),
+      title: "Sprobuj zawezic pytanie lub zmienic horyzont czasowy",
+      body: "Mozesz zmienic zakres czasowy na 72h lub 168h, lub wpisac konkretny temat w polu pytania.",
     },
     {
-      title: "Tempo naplywu wiarygodnych informacji bedzie kluczowe dla kierunku rynku",
-      body: normalizeBody("Gdy rynek dostaje spojne potwierdzenia, wycena szybciej stabilizuje nowy zakres ryzyka. Przy sygnalach sprzecznych dominuja szybkie przejscia miedzy risk-on i risk-off."),
-    },
-    {
-      title: "Efekt drugiej rundy moze przejsc przez inflacje i oczekiwania stop procentowych",
-      body: normalizeBody("Jesli presja na energie utrzyma sie dluzej, inwestorzy moga podniesc wyceny ryzyka makro i kosztu pieniadza. Wtedy geopolityka zaczyna dzialac nie tylko przez naglowki, ale przez fundamenty polityki monetarnej."),
-    },
-    {
-      title: "Najbardziej liczy sie selekcja aktywow wedlug wrazliwosci, a nie szeroki risk-off",
-      body: normalizeBody("Przewaga informacyjna wynika z rozroznienia, ktore klasy aktywow sa bezposrednio dotkniete, a ktore tylko chwilowo podazaja za sentymentem. To ogranicza ryzyko reakcji opartych wyłącznie na ogolnym tle geopolitycznym."),
+      title: "Brak zrodel dla wybranego zakresu",
+      body: "Dostepne zrodla nie zawieraly informacji pasujacych do wybranego kontekstu i regionu.",
     },
   ];
 

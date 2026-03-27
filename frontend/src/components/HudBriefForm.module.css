@@ -34,12 +34,6 @@
   text-transform: uppercase;
 }
 
-.statusGrid {
-  display: grid;
-  gap: 6px;
-  min-width: 280px;
-}
-
 .clockLine {
   color: #d8e6ff;
   font-size: 13px;
@@ -48,30 +42,6 @@
   text-align: right;
 }
 
-.tickerRow {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-}
-
-.ticker {
-  border: 1px solid rgba(154, 184, 226, 0.4);
-  border-radius: 8px;
-  padding: 6px 10px;
-  color: #d6e4ff;
-  background: linear-gradient(180deg, rgba(47, 63, 86, 0.7), rgba(29, 40, 57, 0.72));
-  font-size: 12px;
-  letter-spacing: 0.06em;
-}
-
-.tickerUp {
-  color: #8fe4a0;
-}
-
-.tickerDown {
-  color: #f1a2a2;
-}
 
 .version {
   margin: 16px 18px 0;
@@ -389,9 +359,7 @@
     padding-bottom: 14px;
   }
 
-  .clockLine,
-  .tickerRow {
-    justify-content: flex-start;
+  .clockLine {
     text-align: left;
   }
 }

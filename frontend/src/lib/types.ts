@@ -116,6 +116,71 @@ export type APIError = {
   debug?: unknown;
 };
 
+export type ThreadCreateRequest = {
+  name: string;
+  assets?: string | null;
+  horizon_days: 7 | 30 | 90;
+  extra_context?: string | null;
+};
+
+export type ThreadScenario = {
+  name: string;
+  trigger: string;
+  probability: string;
+  market_impact: string;
+};
+
+export type ThreadDevelopment = {
+  date: string;
+  title: string;
+  body: string;
+};
+
+export type ThreadAsset = {
+  asset: string;
+  direction: string;
+  why: string;
+  confidence: string;
+};
+
+export type ThreadSnapshot = {
+  background?: string;
+  key_actors?: { name: string; role: string; position: string }[];
+  timeline?: { date: string; event: string; significance: string }[];
+  current_state?: string;
+  latest_developments?: ThreadDevelopment[];
+  scenarios?: ThreadScenario[];
+  market_implications?: {
+    assets?: ThreadAsset[];
+    sectors?: string[];
+    correlation_map?: string;
+  };
+  sources_used?: { title: string; url: string; provider: string }[];
+  confidence_level?: string;
+  error?: string;
+};
+
+export type Thread = {
+  id: number;
+  name: string;
+  assets: string | null;
+  horizon_days: number;
+  extra_context: string | null;
+  status: "initializing" | "ready" | "refreshing";
+  new_events_count: number;
+  context_snapshot: ThreadSnapshot | null;
+  created_at: string;
+  last_refreshed_at: string | null;
+};
+
+export type ThreadSuggestion = {
+  suggest: boolean;
+  name?: string;
+  assets?: string;
+  horizon_days?: number;
+  reason?: string;
+};
+
 export type AuthUser = {
   id: number;
   email: string;

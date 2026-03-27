@@ -24,3 +24,4 @@ class User(Base):
     )
 
     preference = relationship("UserPreference", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    usage_logs = relationship("UsageLog", back_populates="user", cascade="all, delete-orphan")

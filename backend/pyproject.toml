@@ -15,6 +15,8 @@ dependencies = [
   "cachetools>=5.3",
   "openai>=1.40.0",
   "beautifulsoup4>=4.12",
+  "psycopg2-binary>=2.9",
+  "apscheduler>=3.10",
 ]
 
 [tool.uv]

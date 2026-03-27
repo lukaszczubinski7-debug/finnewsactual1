@@ -267,8 +267,13 @@ export default function Dashboard() {
                   <QuoteTile quote={quotes.get(cell.ticker)!} onRemove={() => handleRemove(cell.ticker)} />
                 ) : (
                   <div style={{ padding: "16px 18px", color: "#2a4060", fontSize: 12, minHeight: 110,
-                    display: "flex", alignItems: "center" }}>
-                    {cell.ticker}…
+                    display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span>{cell.ticker}…</span>
+                    <button onClick={() => handleRemove(cell.ticker)} style={{
+                      background: "none", border: "none", color: "rgba(80,110,150,0.35)",
+                      cursor: "pointer", fontSize: 12, padding: "0 2px" }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(80,110,150,0.35)"; }}>✕</button>
                   </div>
                 )
               ) : i === tickers.length ? (

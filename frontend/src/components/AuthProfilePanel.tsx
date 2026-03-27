@@ -173,7 +173,7 @@ export default function AuthProfilePanel({
           <p style={{ margin: "0 0 4px", fontSize: 10, color: "#4a6890", letterSpacing: "0.1em", textTransform: "uppercase" }}>Kim jestem</p>
           <textarea
             className={styles.textArea}
-            placeholder="Opisz siebie jako inwestora — kim jesteś, czym się zajmujesz, jaki styl preferujesz (np. inwestor długoterminowy GPW, trader FX, analityk makro)"
+            placeholder="np. inwestor GPW, trader FX, analityk makro"
             value={searchProfileText}
             onChange={(event) => setSearchProfileText(event.target.value)}
             style={{ minHeight: 90 }}
@@ -182,7 +182,7 @@ export default function AuthProfilePanel({
           <p style={{ margin: "12px 0 4px", fontSize: 10, color: "#4a6890", letterSpacing: "0.1em", textTransform: "uppercase" }}>Co mnie interesuje</p>
           <textarea
             className={styles.textArea}
-            placeholder="Aktywa, rynki, regiony, tematy — wszystko co chcesz żeby asystent brał pod uwagę (np. GPW, energetyka, USD/PLN, Bliski Wschód, polityka monetarna Fed)"
+            placeholder="np. GPW, energetyka, USD/PLN, Bliski Wschód, Fed"
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             style={{ minHeight: 90 }}

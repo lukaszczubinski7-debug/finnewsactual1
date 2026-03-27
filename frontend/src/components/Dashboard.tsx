@@ -6,9 +6,9 @@ import type { MarketCategory, MarketQuote } from "../lib/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface DashGroup { id: string; name: string; tickers: string[] }
+interface DashGroup { id: string; name: string; tickers: string[]; col: 0 | 1 }
 
-const STORAGE_KEY = "dashboard_groups_v2";
+const STORAGE_KEY = "dashboard_groups_v3";
 const REFRESH_MS = 60_000;
 
 function loadGroups(): DashGroup[] {
@@ -43,56 +43,44 @@ function fmtPct(n: number | null): string {
   return `${s}${n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
-// ── Ticker Row ─────────────────────────────────────────────────────────────────
+// ── Ticker Row ────────────────────────────────────────────────────────────────
 
-function TickerRow({ quote, loading, ticker, onRemove }: {
-  quote?: MarketQuote; loading?: boolean; ticker: string; onRemove: () => void;
+function TickerRow({ quote, ticker, onRemove }: {
+  quote?: MarketQuote; ticker: string; onRemove: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
+  const [hov, setHov] = useState(false);
   const pos = (quote?.change ?? 0) >= 0;
   const clr = pos ? "#4ade80" : "#f87171";
-  const bgClr = pos ? "rgba(34,90,50,0.45)" : "rgba(90,30,30,0.45)";
+  const bg  = pos ? "rgba(34,90,50,0.45)" : "rgba(90,30,30,0.45)";
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: "flex", alignItems: "center", padding: "7px 10px",
+    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ display: "flex", alignItems: "center", padding: "7px 10px",
         borderBottom: "1px solid rgba(80,120,180,0.08)",
-        background: hovered ? "rgba(30,50,90,0.25)" : "transparent",
-        transition: "background 0.1s", gap: 8,
-      }}>
+        background: hov ? "rgba(30,50,90,0.25)" : "transparent", gap: 8 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: "#c0d4f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {quote?.name ?? ticker}
         </div>
-        <div style={{ fontSize: 9, color: "#2a4870", letterSpacing: "0.06em" }}>{ticker}</div>
+        <div style={{ fontSize: 9, color: "#2a4870", letterSpacing: "0.05em" }}>{ticker}</div>
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
-        {loading ? (
-          <span style={{ fontSize: 10, color: "#1e3555" }}>ładowanie…</span>
+        {!quote ? (
+          <span style={{ fontSize: 10, color: "#1e3555" }}>…</span>
         ) : (
           <>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#eef4ff", fontVariantNumeric: "tabular-nums" }}>
-              {fmtPrice(quote?.price ?? null)}
-            </div>
-            <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", alignItems: "center" }}>
-              <span style={{ fontSize: 10, color: clr, fontVariantNumeric: "tabular-nums" }}>{fmtChange(quote?.change ?? null)}</span>
-              <span style={{ fontSize: 10, background: bgClr, color: clr, borderRadius: 4, padding: "1px 5px", fontWeight: 600 }}>{fmtPct(quote?.change_pct ?? null)}</span>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#eef4ff", fontVariantNumeric: "tabular-nums" }}>{fmtPrice(quote.price)}</div>
+            <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+              <span style={{ fontSize: 10, color: clr, fontVariantNumeric: "tabular-nums" }}>{fmtChange(quote.change)}</span>
+              <span style={{ fontSize: 10, background: bg, color: clr, borderRadius: 4, padding: "1px 5px", fontWeight: 600 }}>{fmtPct(quote.change_pct)}</span>
             </div>
           </>
         )}
       </div>
-      <button
-        onClick={(e) => { e.stopPropagation(); onRemove(); }}
-        style={{
-          opacity: hovered ? 1 : 0, background: "rgba(30,45,70,0.9)",
-          border: "1px solid rgba(100,130,180,0.3)", borderRadius: 4,
-          color: "rgba(160,190,230,0.8)", cursor: "pointer",
-          fontSize: 10, padding: "2px 6px", fontWeight: 700,
-          transition: "opacity 0.15s", flexShrink: 0,
-        }}
+      <button onClick={(e) => { e.stopPropagation(); onRemove(); }} style={{
+        opacity: hov ? 1 : 0, background: "rgba(30,45,70,0.9)", border: "1px solid rgba(100,130,180,0.3)",
+        borderRadius: 4, color: "rgba(160,190,230,0.8)", cursor: "pointer", fontSize: 10,
+        padding: "2px 6px", fontWeight: 700, transition: "opacity 0.15s", flexShrink: 0 }}
         onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.color = "#f87171"; b.style.background = "rgba(80,20,20,0.9)"; }}
         onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.color = "rgba(160,190,230,0.8)"; b.style.background = "rgba(30,45,70,0.9)"; }}>
         ✕
@@ -101,11 +89,11 @@ function TickerRow({ quote, loading, ticker, onRemove }: {
   );
 }
 
-// ── Ticker Selector Modal ──────────────────────────────────────────────────────
+// ── Ticker Selector ───────────────────────────────────────────────────────────
 
 function TickerSelector({ categories, usedTickers, onSelect, onClose }: {
   categories: MarketCategory[]; usedTickers: Set<string>;
-  onSelect: (ticker: string) => void; onClose: () => void;
+  onSelect: (t: string) => void; onClose: () => void;
 }) {
   const [cat, setCat] = useState<MarketCategory | null>(null);
   return (
@@ -151,7 +139,7 @@ function TickerSelector({ categories, usedTickers, onSelect, onClose }: {
   );
 }
 
-// ── New Group Modal ────────────────────────────────────────────────────────────
+// ── New Group Modal ───────────────────────────────────────────────────────────
 
 function NewGroupModal({ onConfirm, onClose }: { onConfirm: (name: string) => void; onClose: () => void }) {
   const [name, setName] = useState("");
@@ -181,33 +169,28 @@ function NewGroupModal({ onConfirm, onClose }: { onConfirm: (name: string) => vo
   );
 }
 
-// ── Group Card ─────────────────────────────────────────────────────────────────
+// ── Group Card ────────────────────────────────────────────────────────────────
 
-function GroupCard({
-  group, quotes, allTickers, categories,
-  onAddTicker, onRemoveTicker, onDeleteGroup, onRenameGroup,
-  dragHandleProps,
-}: {
+function GroupCard({ group, quotes, allTickers, categories, onAddTicker, onRemoveTicker, onDeleteGroup, onRenameGroup, isDragging }: {
   group: DashGroup; quotes: Map<string, MarketQuote>; allTickers: Set<string>; categories: MarketCategory[];
   onAddTicker: (id: string, ticker: string) => void; onRemoveTicker: (id: string, ticker: string) => void;
   onDeleteGroup: (id: string) => void; onRenameGroup: (id: string, name: string) => void;
-  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
+  isDragging: boolean;
 }) {
   const [showSel, setShowSel] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameVal, setRenameVal] = useState(group.name);
 
   return (
-    <div style={{ background: "rgba(10,18,32,0.75)", border: "1px solid rgba(80,120,190,0.18)",
-      borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div style={{ background: isDragging ? "rgba(20,36,70,0.95)" : "rgba(10,18,32,0.75)",
+      border: `1px solid ${isDragging ? "rgba(80,130,220,0.5)" : "rgba(80,120,190,0.18)"}`,
+      borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column",
+      boxShadow: isDragging ? "0 8px 32px rgba(0,0,0,0.6)" : "none",
+      transition: "box-shadow 0.15s, border-color 0.15s" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 10px",
-        borderBottom: "1px solid rgba(80,120,190,0.12)", background: "rgba(14,24,44,0.5)" }}>
-        {/* Drag handle */}
-        <div {...dragHandleProps} title="Przesuń" style={{
-          cursor: "grab", color: "#1e3555", fontSize: 13, padding: "0 4px 0 0",
-          lineHeight: 1, userSelect: "none", ...dragHandleProps?.style }}>⠿</div>
-
+        borderBottom: "1px solid rgba(80,120,190,0.12)", background: "rgba(14,24,44,0.5)", cursor: "grab" }}>
+        <span style={{ color: "#1e3555", fontSize: 14, marginRight: 2, userSelect: "none" }}>⠿</span>
         {renaming ? (
           <input autoFocus value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
             onBlur={() => { if (renameVal.trim()) onRenameGroup(group.id, renameVal.trim()); setRenaming(false); }}
@@ -215,32 +198,27 @@ function GroupCard({
             style={{ flex: 1, background: "rgba(8,14,26,0.8)", border: "1px solid rgba(80,120,180,0.35)",
               borderRadius: 5, color: "#c0d4f0", fontSize: 11, fontWeight: 700, padding: "3px 7px", outline: "none" }} />
         ) : (
-          <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: "#90b8e0", letterSpacing: "0.08em", textTransform: "uppercase",
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{group.name}</span>
+          <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: "#90b8e0", letterSpacing: "0.08em",
+            textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{group.name}</span>
         )}
-
-        <button onClick={() => { setRenameVal(group.name); setRenaming(true); }} title="Zmień nazwę"
-          style={{ background: "none", border: "none", color: "#1e3555", cursor: "pointer", fontSize: 11, padding: "0 2px", lineHeight: 1 }}
+        <button onClick={(e) => { e.stopPropagation(); setRenameVal(group.name); setRenaming(true); }}
+          style={{ background: "none", border: "none", color: "#1e3555", cursor: "pointer", fontSize: 11, padding: "0 2px" }}
           onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#6a9ac8"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#1e3555"; }}>✏</button>
-        <button onClick={() => onDeleteGroup(group.id)} title="Usuń grupę"
-          style={{ background: "none", border: "none", color: "#1e3555", cursor: "pointer", fontSize: 11, padding: "0 2px", lineHeight: 1 }}
+        <button onClick={(e) => { e.stopPropagation(); onDeleteGroup(group.id); }}
+          style={{ background: "none", border: "none", color: "#1e3555", cursor: "pointer", fontSize: 11, padding: "0 2px" }}
           onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#1e3555"; }}>✕</button>
       </div>
-
       {/* Tickers */}
-      <div style={{ flex: 1 }}>
-        {group.tickers.length === 0 && (
-          <div style={{ padding: "14px 10px", color: "#1e3555", fontSize: 11, textAlign: "center" }}>Brak tickerów</div>
-        )}
-        {group.tickers.map((ticker) => (
-          <TickerRow key={ticker} ticker={ticker} quote={quotes.get(ticker)} loading={!quotes.has(ticker)}
-            onRemove={() => onRemoveTicker(group.id, ticker)} />
-        ))}
-      </div>
-
-      {/* Add ticker */}
+      {group.tickers.length === 0 && (
+        <div style={{ padding: "14px 10px", color: "#1e3555", fontSize: 11, textAlign: "center" }}>Brak tickerów</div>
+      )}
+      {group.tickers.map((ticker) => (
+        <TickerRow key={ticker} ticker={ticker} quote={quotes.get(ticker)}
+          onRemove={() => onRemoveTicker(group.id, ticker)} />
+      ))}
+      {/* Add */}
       <button onClick={() => setShowSel(true)} style={{
         margin: "8px 10px 10px", padding: "6px 10px", background: "rgba(16,30,56,0.5)",
         border: "1px dashed rgba(60,100,170,0.3)", borderRadius: 7, color: "rgba(70,120,190,0.6)",
@@ -250,7 +228,6 @@ function GroupCard({
         onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(16,30,56,0.5)"; b.style.color = "rgba(70,120,190,0.6)"; b.style.borderColor = "rgba(60,100,170,0.3)"; }}>
         <span style={{ fontSize: 14, lineHeight: 1 }}>+</span> Dodaj ticker
       </button>
-
       {showSel && (
         <TickerSelector categories={categories} usedTickers={allTickers}
           onSelect={(t) => onAddTicker(group.id, t)} onClose={() => setShowSel(false)} />
@@ -259,19 +236,84 @@ function GroupCard({
   );
 }
 
-// ── Dashboard ──────────────────────────────────────────────────────────────────
+// ── Column ────────────────────────────────────────────────────────────────────
+
+function Column({ colIdx, groups, quotes, allTickers, categories, dragId, onDragStart, onDrop,
+  onAddTicker, onRemoveTicker, onDeleteGroup, onRenameGroup, onAddGroup }: {
+  colIdx: 0 | 1; groups: DashGroup[]; quotes: Map<string, MarketQuote>;
+  allTickers: Set<string>; categories: MarketCategory[];
+  dragId: string | null;
+  onDragStart: (id: string) => void;
+  onDrop: (targetId: string | null, col: 0 | 1) => void;
+  onAddTicker: (id: string, ticker: string) => void; onRemoveTicker: (id: string, ticker: string) => void;
+  onDeleteGroup: (id: string) => void; onRenameGroup: (id: string, name: string) => void;
+  onAddGroup: (col: 0 | 1) => void;
+}) {
+  const [dragOverId, setDragOverId] = useState<string | "bottom" | null>(null);
+
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
+
+  return (
+    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}
+      onDragOver={handleDragOver}
+      onDrop={(e) => { e.preventDefault(); onDrop(null, colIdx); setDragOverId(null); }}>
+
+      {groups.map((group) => (
+        <div key={group.id}
+          draggable
+          onDragStart={(e) => { e.stopPropagation(); onDragStart(group.id); }}
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverId(group.id); }}
+          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(group.id, colIdx); setDragOverId(null); }}
+          onDragLeave={() => setDragOverId(null)}
+          style={{ opacity: dragId === group.id ? 0.45 : 1, transition: "opacity 0.15s",
+            outline: dragOverId === group.id && dragId !== group.id ? "2px dashed rgba(80,140,240,0.5)" : "none",
+            borderRadius: 12 }}>
+          <GroupCard
+            group={group} quotes={quotes} allTickers={allTickers} categories={categories}
+            isDragging={dragId === group.id}
+            onAddTicker={onAddTicker} onRemoveTicker={onRemoveTicker}
+            onDeleteGroup={onDeleteGroup} onRenameGroup={onRenameGroup}
+          />
+        </div>
+      ))}
+
+      {/* Drop zone at column bottom */}
+      <div onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverId("bottom"); }}
+        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDrop(null, colIdx); setDragOverId(null); }}
+        onDragLeave={() => setDragOverId(null)}
+        style={{ minHeight: 40, borderRadius: 10, border: dragOverId === "bottom" && dragId ? "2px dashed rgba(80,140,240,0.4)" : "2px dashed transparent",
+          transition: "border-color 0.15s" }} />
+
+      {/* Add group button for this column */}
+      <button onClick={() => onAddGroup(colIdx)} style={{
+        padding: "7px 14px", background: "rgba(14,26,50,0.5)",
+        border: "1px dashed rgba(60,100,170,0.25)", borderRadius: 9,
+        color: "rgba(60,110,180,0.5)", cursor: "pointer",
+        fontSize: 10, fontWeight: 600, letterSpacing: "0.08em",
+        display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s" }}
+        onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(30,55,110,0.5)"; b.style.color = "rgba(130,180,255,0.9)"; b.style.borderColor = "rgba(100,160,240,0.4)"; }}
+        onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(14,26,50,0.5)"; b.style.color = "rgba(60,110,180,0.5)"; b.style.borderColor = "rgba(60,100,170,0.25)"; }}>
+        <span style={{ fontSize: 14, lineHeight: 1 }}>+</span> Dodaj grupę
+      </button>
+    </div>
+  );
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const [groups, setGroups] = useState<DashGroup[]>([]);
   const [quotes, setQuotes] = useState<Map<string, MarketQuote>>(new Map());
   const [categories, setCategories] = useState<MarketCategory[]>([]);
-  const [showNewGroup, setShowNewGroup] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const dragSrc = useRef<number | null>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
+  const [newGroupCol, setNewGroupCol] = useState<0 | 1 | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
 
   useEffect(() => {
-    setGroups(loadGroups());
+    // Migrate old format (no col property) → assign col: 0
+    const loaded = loadGroups();
+    const migrated = loaded.map((g) => ({ col: 0 as const, ...g }));
+    setGroups(migrated);
     getMarketInstruments().then((r) => setCategories(r.categories)).catch(() => {});
   }, []);
 
@@ -299,81 +341,67 @@ export default function Dashboard() {
 
   const update = (next: DashGroup[]) => { setGroups(next); saveGroups(next); };
 
-  // Drag-and-drop reorder (grid-level — handles both horizontal and vertical)
-  const handleDragStart = (i: number) => { dragSrc.current = i; };
-  const handleDragEnd = () => { dragSrc.current = null; };
+  const handleDrop = (targetId: string | null, col: 0 | 1) => {
+    if (!dragId) return;
+    setDragId(null);
+    const src = groups.find((g) => g.id === dragId);
+    if (!src) return;
+    const withoutSrc = groups.filter((g) => g.id !== dragId);
+    const updated = src.col !== col ? { ...src, col } : src;
 
-  const handleGridDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (dragSrc.current === null || !gridRef.current) return;
-    const cells = Array.from(gridRef.current.children) as HTMLElement[];
-    let closest = -1;
-    let closestDist = Infinity;
-    cells.forEach((cell, i) => {
-      const rect = cell.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
-      if (dist < closestDist) { closestDist = dist; closest = i; }
-    });
-    if (closest === -1 || closest === dragSrc.current) return;
-    const next = [...groups];
-    const [moved] = next.splice(dragSrc.current, 1);
-    next.splice(closest, 0, moved);
-    dragSrc.current = closest;
-    update(next);
+    if (!targetId) {
+      // Drop at bottom of column
+      const colItems = withoutSrc.filter((g) => g.col === col);
+      const otherItems = withoutSrc.filter((g) => g.col !== col);
+      update([...otherItems, ...colItems, updated]);
+    } else {
+      // Drop before target
+      const idx = withoutSrc.findIndex((g) => g.id === targetId);
+      const result = [...withoutSrc];
+      result.splice(idx, 0, updated);
+      update(result);
+    }
+  };
+
+  const col0 = groups.filter((g) => g.col === 0);
+  const col1 = groups.filter((g) => g.col === 1);
+
+  const sharedProps = {
+    quotes, allTickers, categories, dragId,
+    onDragStart: (id: string) => setDragId(id),
+    onDrop: handleDrop,
+    onAddTicker: (id: string, ticker: string) => {
+      update(groups.map((g) => g.id === id ? { ...g, tickers: [...g.tickers, ticker] } : g));
+      void fetchQuotes([ticker]);
+    },
+    onRemoveTicker: (id: string, ticker: string) =>
+      update(groups.map((g) => g.id === id ? { ...g, tickers: g.tickers.filter((t) => t !== ticker) } : g)),
+    onDeleteGroup: (id: string) => update(groups.filter((g) => g.id !== id)),
+    onRenameGroup: (id: string, name: string) => update(groups.map((g) => g.id === id ? { ...g, name } : g)),
+    onAddGroup: (col: 0 | 1) => setNewGroupCol(col),
   };
 
   return (
     <div style={{ padding: "0 4px" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
         <span style={{ fontSize: 10, color: "#1e3555", letterSpacing: "0.1em", textTransform: "uppercase" }}>Dashboard rynkowy</span>
-        {lastRefresh && (
-          <span style={{ fontSize: 10, color: "#1a2e4a" }}>· {lastRefresh.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}</span>
-        )}
+        {lastRefresh && <span style={{ fontSize: 10, color: "#1a2e4a" }}>· {lastRefresh.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}</span>}
       </div>
 
-      {groups.length === 0 && (
-        <div style={{ textAlign: "center", padding: "50px 20px", color: "#1e3555" }}>
-          <p style={{ fontSize: 13, marginBottom: 6 }}>Brak grup</p>
-          <p style={{ fontSize: 11 }}>Utwórz pierwszą grupę klikając przycisk poniżej</p>
-        </div>
+      {/* 2-column layout */}
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}
+        onDragEnd={() => setDragId(null)}>
+        <Column colIdx={0} groups={col0} {...sharedProps} />
+        <Column colIdx={1} groups={col1} {...sharedProps} />
+      </div>
+
+      {newGroupCol !== null && (
+        <NewGroupModal
+          onConfirm={(name) => update([...groups, { id: uid(), name, tickers: [], col: newGroupCol }])}
+          onClose={() => setNewGroupCol(null)}
+        />
       )}
-
-      {/* Groups grid */}
-      <div ref={gridRef} onDragOver={handleGridDragOver}
-        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14, marginBottom: 16 }}>
-        {groups.map((group, i) => (
-          <div key={group.id}
-            draggable
-            onDragStart={() => handleDragStart(i)}
-            onDragEnd={handleDragEnd}
-            style={{ cursor: "default" }}>
-            <GroupCard
-              group={group} quotes={quotes} allTickers={allTickers} categories={categories}
-              onAddTicker={(id, ticker) => { update(groups.map((g) => g.id === id ? { ...g, tickers: [...g.tickers, ticker] } : g)); void fetchQuotes([ticker]); }}
-              onRemoveTicker={(id, ticker) => update(groups.map((g) => g.id === id ? { ...g, tickers: g.tickers.filter((t) => t !== ticker) } : g))}
-              onDeleteGroup={(id) => update(groups.filter((g) => g.id !== id))}
-              onRenameGroup={(id, name) => update(groups.map((g) => g.id === id ? { ...g, name } : g))}
-            />
-          </div>
-        ))}
-      </div>
-
-      {/* Add group */}
-      <button onClick={() => setShowNewGroup(true)} style={{
-        padding: "8px 18px", background: "rgba(14,26,50,0.5)",
-        border: "1px dashed rgba(60,100,170,0.3)", borderRadius: 9,
-        color: "rgba(70,120,190,0.65)", cursor: "pointer",
-        fontSize: 11, fontWeight: 600, letterSpacing: "0.08em",
-        display: "flex", alignItems: "center", gap: 7, transition: "all 0.15s" }}
-        onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(30,55,110,0.5)"; b.style.color = "rgba(130,180,255,0.9)"; b.style.borderColor = "rgba(100,160,240,0.4)"; }}
-        onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(14,26,50,0.5)"; b.style.color = "rgba(70,120,190,0.65)"; b.style.borderColor = "rgba(60,100,170,0.3)"; }}>
-        <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Dodaj grupę
-      </button>
-
-      {showNewGroup && <NewGroupModal onConfirm={(name) => update([...groups, { id: uid(), name, tickers: [] }])} onClose={() => setShowNewGroup(false)} />}
     </div>
   );
 }

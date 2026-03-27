@@ -482,6 +482,16 @@ export default function Page() {
     </div>
   );
 
+  const navBtnStyle = (tab: ActiveTab): React.CSSProperties => ({
+    width: "100%", padding: "11px 16px",
+    borderRadius: 9, border: "none", cursor: "pointer",
+    fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase",
+    textAlign: "left",
+    color: activeTab === tab ? "#f0f6ff" : "#4a6890",
+    background: activeTab === tab ? "rgba(60,96,160,0.55)" : "transparent",
+    transition: "all 0.15s",
+  });
+
   const tabBtnStyle = (tab: ActiveTab): React.CSSProperties => ({
     padding: "9px 22px",
     borderRadius: 999,
@@ -495,108 +505,171 @@ export default function Page() {
     textTransform: "uppercase" as const,
   });
 
-  const leftColumn = (
-    <div style={{ display: "grid", gap: 22 }}>
-      {briefContent}
-    </div>
+  // ── Sidebar ───────────────────────────────────────────────────────────────
+  const sidebar = (
+    <aside style={{
+      width: 190, flexShrink: 0,
+      display: "flex", flexDirection: "column", gap: 6,
+      padding: "20px 12px",
+      background: "rgba(8,14,24,0.7)",
+      borderRight: "1px solid rgba(100,140,200,0.1)",
+      minHeight: "100vh",
+      position: "sticky", top: 0, alignSelf: "flex-start",
+    }}>
+      {/* Auth info */}
+      <div style={{
+        padding: "10px 12px", marginBottom: 10,
+        borderRadius: 9, background: "rgba(20,35,60,0.6)",
+        border: "1px solid rgba(80,120,180,0.2)",
+      }}>
+        {user ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 10, color: "#4a6890", letterSpacing: "0.1em", textTransform: "uppercase" }}>Zalogowano</span>
+            <span style={{ fontSize: 11, color: "#8ab4d8", fontWeight: 600, wordBreak: "break-all" }}>{user.email}</span>
+            <div style={{ display: "flex", gap: 5, marginTop: 2 }}>
+              <button onClick={() => { setAuthError(null); setAuthMode("profile"); if (token) void loadPreferences(token); }} style={{
+                flex: 1, fontSize: 10, padding: "4px 0", background: "rgba(30,50,90,0.7)",
+                border: "1px solid rgba(80,120,180,0.25)", borderRadius: 6, color: "#6a9ac8", cursor: "pointer" }}>
+                Profil
+              </button>
+              <button onClick={handleLogout} style={{
+                flex: 1, fontSize: 10, padding: "4px 0", background: "rgba(30,50,90,0.7)",
+                border: "1px solid rgba(80,120,180,0.25)", borderRadius: 6, color: "#6a9ac8", cursor: "pointer" }}>
+                Wyloguj
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <button onClick={() => { setAuthError(null); setAuthMode("login"); }} style={{
+              fontSize: 11, padding: "7px 0", background: "rgba(40,70,130,0.6)",
+              border: "1px solid rgba(80,130,200,0.3)", borderRadius: 7, color: "#90c0f0", cursor: "pointer", fontWeight: 600 }}>
+              Zaloguj
+            </button>
+            <button onClick={() => { setAuthError(null); setAuthMode("register"); }} style={{
+              fontSize: 11, padding: "7px 0", background: "transparent",
+              border: "1px solid rgba(60,90,140,0.3)", borderRadius: 7, color: "#4a6890", cursor: "pointer" }}>
+              Załóż konto
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <button type="button" style={navBtnStyle("brief")} onClick={() => setActiveTab("brief")}
+        onMouseEnter={(e) => { if (activeTab !== "brief") (e.currentTarget as HTMLButtonElement).style.color = "#8ab4d8"; }}
+        onMouseLeave={(e) => { if (activeTab !== "brief") (e.currentTarget as HTMLButtonElement).style.color = "#4a6890"; }}>
+        Briefy geopolityczne
+      </button>
+      <button type="button" style={navBtnStyle("dashboard")} onClick={() => setActiveTab("dashboard")}
+        onMouseEnter={(e) => { if (activeTab !== "dashboard") (e.currentTarget as HTMLButtonElement).style.color = "#8ab4d8"; }}
+        onMouseLeave={(e) => { if (activeTab !== "dashboard") (e.currentTarget as HTMLButtonElement).style.color = "#4a6890"; }}>
+        Dashboard
+      </button>
+    </aside>
   );
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        padding: "26px 18px 64px",
-        background:
-          "radial-gradient(circle at top right, rgba(72, 93, 123, 0.2) 0%, transparent 35%), radial-gradient(circle at bottom left, rgba(72, 97, 131, 0.12) 0%, transparent 30%), linear-gradient(180deg, #0a0f16 0%, #05090f 100%)",
-      }}
-    >
-      {/* Tab navigation */}
-      <nav
-        style={{
-          maxWidth: 1600,
-          margin: "0 auto 20px",
-          display: "flex",
-          gap: 8,
-          borderBottom: "1px solid rgba(186,205,231,0.1)",
-          paddingBottom: 16,
-        }}
-      >
-        <button type="button" style={tabBtnStyle("brief")} onClick={() => setActiveTab("brief")}>
-          Brief
-        </button>
-        <button type="button" style={tabBtnStyle("dashboard")} onClick={() => setActiveTab("dashboard")}>
-          Dashboard
-        </button>
-      </nav>
+    <div style={{
+      minHeight: "100vh",
+      background: "radial-gradient(circle at top right, rgba(72,93,123,0.2) 0%, transparent 35%), radial-gradient(circle at bottom left, rgba(72,97,131,0.12) 0%, transparent 30%), linear-gradient(180deg, #0a0f16 0%, #05090f 100%)",
+      display: "flex",
+    }}>
+      {sidebar}
 
-      {/* Dashboard tab */}
-      {activeTab === "dashboard" && (
-        <div style={{ maxWidth: 1600, margin: "0 auto" }}>
-          <Dashboard />
-        </div>
-      )}
+      {/* Main content */}
+      <div style={{ flex: 1, minWidth: 0, padding: "26px 20px 64px", display: "flex", gap: 20, alignItems: "flex-start" }}>
 
-      {/* Brief tab */}
-      {activeTab === "brief" && (
-        <>
-          {user && token ? (
-            <div
-              style={{
-                maxWidth: 1600,
-                margin: "0 auto",
-                display: "grid",
-                gridTemplateColumns: "1fr 340px",
-                gap: 22,
-                alignItems: "start",
-              }}
-            >
-              {leftColumn}
-              <div style={{ position: "sticky", top: 26 }}>
-                <ThreadsPanel
-                  threads={threads}
-                  loading={threadLoading}
-                  creating={threadCreating}
-                  refreshingAll={threadRefreshingAll}
-                  refreshingId={threadRefreshingId}
-                  error={threadError}
-                  selectedId={selectedThread?.id ?? null}
-                  onSelect={(thread) => setSelectedThread(thread)}
-                  onCreate={handleCreateThread}
-                  onRefresh={handleRefreshThread}
-                  onRefreshAll={handleRefreshAll}
-                  onDelete={handleDeleteThread}
+        {/* Auth form modal */}
+        {authMode !== "closed" && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(4,8,14,0.88)",
+            display: "flex", alignItems: "flex-start", justifyContent: "center",
+            padding: "60px 18px", overflowY: "auto" }}
+            onClick={(e) => { if (e.target === e.currentTarget) setAuthMode("closed"); }}>
+            <div style={{ width: "100%", maxWidth: 520 }} className={styles.panel}>
+              <AuthProfilePanel
+                user={user} authMode={authMode} loading={authLoading} error={authError}
+                preference={preferences} preferenceLoading={preferenceLoading}
+                onOpenLogin={() => { setAuthError(null); setAuthMode("login"); }}
+                onOpenRegister={() => { setAuthError(null); setAuthMode("register"); }}
+                onOpenProfile={() => { if (!token) { setAuthError("Brak sesji."); return; } setAuthError(null); setAuthMode("profile"); void loadPreferences(token); }}
+                onClose={() => setAuthMode("closed")}
+                onLogin={handleLogin} onRegister={handleRegister} onLogout={handleLogout}
+                onDeleteAccount={handleDeleteAccount} onSavePreferences={handleSavePreferences}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Dashboard */}
+        {activeTab === "dashboard" && (
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Dashboard />
+          </div>
+        )}
+
+        {/* Brief */}
+        {activeTab === "brief" && (
+          <>
+            <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 22 }}>
+              <section className={styles.panel}>
+                <HeaderBar />
+                <AnalysisPanel
+                  mainQuestion={mainQuestion}
+                  disabled={loading}
+                  validationMessage={inputValidationMessage}
+                  onMainQuestionChange={(value) => { setInputValidationMessage(null); setMainQuestion(value); }}
                 />
-              </div>
+                <FooterActions canGenerate={canGenerate} loading={loading} onGenerate={handleSubmit} onCancel={handleCancel} />
+              </section>
 
-              {/* Thread detail modal */}
-              {selectedThread && (
-                <div
-                  style={{
-                    position: "fixed",
-                    inset: 0,
-                    zIndex: 100,
-                    background: "rgba(5,9,15,0.82)",
-                    display: "flex",
-                    alignItems: "flex-start",
-                    justifyContent: "center",
-                    padding: "40px 18px 40px",
-                    overflowY: "auto",
-                  }}
-                  onClick={(e) => { if (e.target === e.currentTarget) setSelectedThread(null); }}
-                >
-                  <div style={{ width: "100%", maxWidth: 860 }}>
-                    <ThreadDetail thread={selectedThread} onClose={() => setSelectedThread(null)} />
-                  </div>
-                </div>
+              {error && (
+                <section role="alert" className={styles.panel} style={{
+                  borderColor: "rgba(217,86,86,0.58)",
+                  boxShadow: "inset 0 0 0 1px rgba(217,86,86,0.24), inset 0 0 24px rgba(217,86,86,0.12), 0 12px 30px rgba(6,8,12,0.45)",
+                  padding: "14px 16px", color: "#ffd7d7" }}>
+                  <strong style={{ display: "block", marginBottom: 6, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                    Blad backendu{error.status ? ` (${error.status})` : ""}
+                  </strong>
+                  <span>{error.message}</span>
+                </section>
+              )}
+
+              {loading && <section className={styles.panel} style={{ padding: "14px 16px", color: "#c6d8f4" }}>Trwa generowanie briefu...</section>}
+              {authLoading && !loading && <section className={styles.panel} style={{ padding: "14px 16px", color: "#c6d8f4" }}>Trwa synchronizacja sesji...</section>}
+              {result && <BriefResult result={result} />}
+              {threadSuggestion && token && (
+                <ThreadSuggestionBanner suggestion={threadSuggestion} onCreate={handleCreateThread} onDismiss={() => setThreadSuggestion(null)} />
               )}
             </div>
-          ) : (
-            <div style={{ maxWidth: 1180, margin: "0 auto" }}>
-              {leftColumn}
-            </div>
-          )}
-        </>
+
+            {user && token && (
+              <div style={{ width: 320, flexShrink: 0, position: "sticky", top: 26 }}>
+                <ThreadsPanel
+                  threads={threads} loading={threadLoading} creating={threadCreating}
+                  refreshingAll={threadRefreshingAll} refreshingId={threadRefreshingId}
+                  error={threadError} selectedId={selectedThread?.id ?? null}
+                  onSelect={(thread) => setSelectedThread(thread)}
+                  onCreate={handleCreateThread} onRefresh={handleRefreshThread}
+                  onRefreshAll={handleRefreshAll} onDelete={handleDeleteThread}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Thread detail modal */}
+      {selectedThread && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(5,9,15,0.82)",
+          display: "flex", alignItems: "flex-start", justifyContent: "center",
+          padding: "40px 18px", overflowY: "auto" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedThread(null); }}>
+          <div style={{ width: "100%", maxWidth: 860 }}>
+            <ThreadDetail thread={selectedThread} onClose={() => setSelectedThread(null)} />
+          </div>
+        </div>
       )}
-    </main>
+    </div>
   );
 }

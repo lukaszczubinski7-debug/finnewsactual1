@@ -36,7 +36,6 @@ INSTRUMENTS: list[dict[str, Any]] = [
     {"ticker": "GC=F",      "name": "Złoto (XAU)",       "category": "Surowce",   "default": True},
     {"ticker": "SI=F",      "name": "Srebro (XAG)",      "category": "Surowce",   "default": False},
     {"ticker": "CL=F",      "name": "Ropa WTI",          "category": "Surowce",   "default": True},
-    {"ticker": "BZ=F",      "name": "Ropa Brent",        "category": "Surowce",   "default": True},
     {"ticker": "NG=F",      "name": "Gaz ziemny",        "category": "Surowce",   "default": False},
     {"ticker": "HG=F",      "name": "Miedź",             "category": "Surowce",   "default": False},
     {"ticker": "ZC=F",      "name": "Kukurydza",         "category": "Surowce",   "default": False},

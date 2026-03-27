@@ -131,11 +131,18 @@ function QuoteTile({ quote, onRemove }: { quote: MarketQuote; onRemove: () => vo
   return (
     <div style={{ padding: "16px 18px", position: "relative" }}>
       <button onClick={onRemove} style={{
-        position: "absolute", top: 10, right: 10,
-        background: "none", border: "none", color: "rgba(70,100,140,0.3)",
-        cursor: "pointer", fontSize: 11, padding: 2, lineHeight: 1 }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(70,100,140,0.3)"; }}>
+        position: "absolute", top: 8, right: 8,
+        background: "rgba(30,50,80,0.8)", border: "1px solid rgba(120,150,200,0.3)",
+        borderRadius: 6, color: "rgba(180,205,235,0.8)",
+        cursor: "pointer", fontSize: 11, padding: "3px 7px", lineHeight: 1 }}
+        onMouseEnter={(e) => {
+          const b = e.currentTarget as HTMLButtonElement;
+          b.style.color = "#f87171"; b.style.background = "rgba(80,25,25,0.85)"; b.style.borderColor = "rgba(248,113,113,0.5)";
+        }}
+        onMouseLeave={(e) => {
+          const b = e.currentTarget as HTMLButtonElement;
+          b.style.color = "rgba(180,205,235,0.8)"; b.style.background = "rgba(30,50,80,0.8)"; b.style.borderColor = "rgba(120,150,200,0.3)";
+        }}>
         ✕
       </button>
       <p style={{ margin: "0 0 2px", color: "#c8dff8", fontSize: 13, fontWeight: 700,

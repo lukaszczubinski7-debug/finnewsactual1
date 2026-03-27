@@ -78,7 +78,12 @@ function Selector({ categories, usedTickers, onSelect, onClose }: {
             color: "#7a9abf", cursor: "pointer", padding: "3px 9px", fontSize: 11 }}>✕</button>
         </div>
         <div style={{ padding: "12px 16px 16px", display: "grid", gap: 6, maxHeight: 420, overflowY: "auto" }}>
-          {!cat ? (
+          {!cat && categories.length === 0 && (
+            <p style={{ color: "#3a5a80", fontSize: 12, textAlign: "center", padding: "20px 0", margin: 0 }}>
+              Ładowanie kategorii... sprawdź czy backend działa.
+            </p>
+          )}
+          {!cat && categories.length > 0 ? (
             categories.map((c) => (
               <button key={c.name} onClick={() => setCat(c)} style={{
                 border: "1px solid rgba(100,140,200,0.22)", borderRadius: 9,
@@ -89,7 +94,7 @@ function Selector({ categories, usedTickers, onSelect, onClose }: {
                 <span style={{ color: "#3a5a80", fontSize: 11 }}>{c.instruments.length} →</span>
               </button>
             ))
-          ) : (
+          ) : cat ? (
             cat.instruments.map((inst) => {
               const used = usedTickers.has(inst.ticker);
               return (
@@ -105,7 +110,7 @@ function Selector({ categories, usedTickers, onSelect, onClose }: {
                 </button>
               );
             })
-          )}
+          ) : null}
         </div>
       </div>
     </div>
@@ -193,7 +198,14 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    getMarketInstruments().then((d) => setCategories(d.categories)).catch(() => {});
+    getMarketInstruments()
+      .then((d) => setCategories(d.categories))
+      .catch(() => {
+        // retry once after 2s if first attempt fails
+        setTimeout(() => {
+          getMarketInstruments().then((d) => setCategories(d.categories)).catch(() => {});
+        }, 2000);
+      });
   }, []);
 
   useEffect(() => {

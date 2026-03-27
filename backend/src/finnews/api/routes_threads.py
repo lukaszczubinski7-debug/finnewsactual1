@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from finnews.middleware.usage_limits import enforce_thread_refresh_limit
 from finnews.api.responses import utf8_json
 from finnews.api.schemas import (
     BriefResponse,
@@ -129,6 +130,8 @@ async def refresh_thread(
     thread = db.query(Thread).filter(Thread.id == thread_id, Thread.user_id == current_user.id).first()
     if not thread:
         raise HTTPException(status_code=404, detail="Watek nie znaleziony.")
+
+    enforce_thread_refresh_limit(db, current_user.id)
 
     query = thread.name + (" " + thread.extra_context if thread.extra_context else "")
     sources = await _fetch_brief_sources(query, REFRESH_WINDOW_HOURS)

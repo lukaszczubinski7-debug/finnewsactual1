@@ -4,20 +4,44 @@ import sys
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 
 from finnews.api.responses import UTF8JSONResponse
 from finnews.api.routes import router
 from finnews.api.routes_auth import router as auth_router
 from finnews.api.routes_profile import router as profile_router
+from finnews.api.routes_market import router as market_router
 from finnews.api.routes_threads import router as threads_router
+from finnews.scheduler import start_scheduler, stop_scheduler
+from finnews.settings import settings
 
 sys.stdout.reconfigure(encoding="utf-8")
 
 app = FastAPI(title="Fin News Agent MVP", default_response_class=UTF8JSONResponse)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in settings.allowed_origins.split(",") if o.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(router)
+app.include_router(market_router)
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(threads_router)
+
+
+@app.on_event("startup")
+async def on_startup() -> None:
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+async def on_shutdown() -> None:
+    stop_scheduler()
 
 
 @app.exception_handler(HTTPException)

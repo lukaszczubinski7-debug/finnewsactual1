@@ -9,6 +9,7 @@ import Charts from "../components/Charts";
 import Dashboard from "../components/Dashboard";
 import FooterActions from "../components/FooterActions";
 import HeaderBar from "../components/HeaderBar";
+import MarketDashboard from "../components/MarketDashboard";
 import ThreadDetail from "../components/ThreadDetail";
 import ThreadsPanel from "../components/ThreadsPanel";
 import ThreadSuggestionBanner from "../components/ThreadSuggestion";
@@ -29,6 +30,7 @@ const ALL_CONTINENTS = ["NA", "EU", "AS", "ME", "SA", "AF", "OC"] as const;
 const initialFormState: BriefRequest = createInitialFormState();
 const AUTH_TOKEN_KEY = "finnews_access_token";
 type AuthMode = "closed" | "login" | "register" | "profile";
+type ActiveTab = "brief" | "market" | "dashboard" | "charts";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMPTY_INPUT_VALIDATION_MESSAGE = "Wpisz pytanie lub uzupelnij profil uzytkownika.";
 
@@ -47,6 +49,7 @@ function hasUsefulProfile(preference: UserPreference | null): boolean {
 }
 
 export default function Page() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>("brief");
   const [mainQuestion, setMainQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
@@ -69,8 +72,6 @@ export default function Page() {
   const [threadRefreshingId, setThreadRefreshingId] = useState<number | null>(null);
   const [threadRefreshingAll, setThreadRefreshingAll] = useState(false);
   const [threadError, setThreadError] = useState<string | null>(null);
-
-  const [activeTab, setActiveTab] = useState<"brief" | "dashboard" | "charts">("brief");
 
   const hasQuestion = useMemo(() => mainQuestion.trim().length > 0, [mainQuestion]);
   const hasProfile = useMemo(() => hasUsefulProfile(preferences), [preferences]);
@@ -350,7 +351,47 @@ export default function Page() {
     }
   };
 
-  const leftColumn = (
+  const tabBar = (
+    <div
+      style={{
+        display: "flex",
+        gap: 0,
+        border: "1px solid rgba(160,186,222,0.24)",
+        borderRadius: 12,
+        overflow: "hidden",
+        background: "rgba(14,20,30,0.7)",
+        alignSelf: "start",
+        width: "fit-content",
+      }}
+    >
+      {(["brief", "market"] as ActiveTab[]).map((tab) => (
+        <button
+          key={tab}
+          onClick={() => setActiveTab(tab)}
+          style={{
+            border: "none",
+            borderRight: tab === "brief" ? "1px solid rgba(160,186,222,0.18)" : "none",
+            padding: "9px 22px",
+            cursor: "pointer",
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: activeTab === tab ? "#f0f6ff" : "#5a7498",
+            background:
+              activeTab === tab
+                ? "linear-gradient(180deg, rgba(60,88,132,0.9), rgba(36,56,88,0.95))"
+                : "transparent",
+            transition: "color 0.15s, background 0.15s",
+          }}
+        >
+          {tab === "brief" ? "Brief" : "Rynek"}
+        </button>
+      ))}
+    </div>
+  );
+
+  const briefContent = (
     <div style={{ display: "grid", gap: 22 }}>
       <section className={styles.panel}>
         <HeaderBar />
@@ -441,7 +482,7 @@ export default function Page() {
     </div>
   );
 
-  const tabBtnStyle = (tab: "brief" | "dashboard" | "charts"): React.CSSProperties => ({
+  const tabBtnStyle = (tab: ActiveTab): React.CSSProperties => ({
     padding: "9px 22px",
     borderRadius: 999,
     border: activeTab === tab ? "1px solid rgba(80,120,180,0.6)" : "1px solid rgba(161,187,224,0.18)",
@@ -453,6 +494,12 @@ export default function Page() {
     letterSpacing: "0.06em",
     textTransform: "uppercase" as const,
   });
+
+  const leftColumn = (
+    <div style={{ display: "grid", gap: 22 }}>
+      {briefContent}
+    </div>
+  );
 
   return (
     <main
@@ -477,6 +524,9 @@ export default function Page() {
         <button type="button" style={tabBtnStyle("brief")} onClick={() => setActiveTab("brief")}>
           Brief
         </button>
+        <button type="button" style={tabBtnStyle("market")} onClick={() => setActiveTab("market")}>
+          Rynek
+        </button>
         <button type="button" style={tabBtnStyle("dashboard")} onClick={() => setActiveTab("dashboard")}>
           Dashboard
         </button>
@@ -484,6 +534,19 @@ export default function Page() {
           Wykresy
         </button>
       </nav>
+
+      {/* Market tab */}
+      {activeTab === "market" && (
+        <div style={{ maxWidth: 1600, margin: "0 auto" }}>
+          <section className={styles.panel} style={{ padding: "18px 20px" }}>
+            <MarketDashboard
+              token={token}
+              preferences={preferences}
+              onPreferencesUpdate={(pref) => setPreferences(pref)}
+            />
+          </section>
+        </div>
+      )}
 
       {/* Dashboard tab */}
       {activeTab === "dashboard" && (

@@ -15,6 +15,8 @@ svc = ProfileService()
 
 
 def _to_response(preference) -> UserPreferenceResponse:
+    raw_tickers = preference.market_tickers
+    market_tickers = [t.strip() for t in raw_tickers.split(",") if t.strip()] if raw_tickers else None
     return UserPreferenceResponse(
         search_profile_text=preference.search_profile_text,
         response_style=preference.response_style,
@@ -22,6 +24,7 @@ def _to_response(preference) -> UserPreferenceResponse:
         interested_regions=preference.interested_regions or [],
         interested_topics=preference.interested_topics or [],
         notes=preference.notes,
+        market_tickers=market_tickers,
     )
 
 

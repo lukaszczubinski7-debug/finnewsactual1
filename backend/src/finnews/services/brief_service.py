@@ -2449,7 +2449,63 @@ async def _generate_summary_via_llm(
                 ),
             }
 
-    return normalized
+    if style == "short":
+        improve_instruction = (
+            "Wynik nie przeszedl quality gate. Popraw JSON tak, aby:\n"
+            "- zwracal tylko mode=quick oraz summary,\n"
+            "- summary bylo jednym akapitem 3-6 zdan (kazde zdanie = jeden osobny fakt),\n"
+            "- kazde zdanie opisywalo konkretny fakt: kto, co, gdzie, kiedy,\n"
+            "- bez prognoz, bez opinii, bez interpretacji, bez konkluzji i bez zaleznosci przyczynowo-skutkowych,\n"
+            "- nie zawieralo fraz meta: Pytanie inwestycyjne, W centrum uwagi, Horyzont decyzyjny, Zakres analizy, Profil, Wybrane regiony, Brief, Fokus geopolityczny,\n"
+            "- nie zawieralo list, sekcji, bulletow, meta-komentarzy i technicznych slow debug/fallback/upstream.\n"
+            "Zwroc ponownie tylko JSON."
+        )
+    else:
+        improve_instruction = (
+            "Wynik nie przeszedl quality gate. Popraw JSON tak, aby:\n"
+            "- zwracal wylacznie headline, mode, items, sources,\n"
+            "- items zawieraly naturalne tytuly i body po 2-3 zdania,\n"
+            "- liczba items pasowala do mode (quick 3-6, standard 3-4, extended 4-5),\n"
+            "- byl maksymalnie konkretny i bez pustych ogolnikow,\n"
+            "- nie zawieral technicznych slow debug/fallback/upstream.\n"
+            "Zwroc ponownie tylko JSON."
+        )
+
+    improve_messages = base_messages + [
+        {"role": "assistant", "content": json.dumps(normalized, ensure_ascii=False)},
+        {"role": "user", "content": improve_instruction},
+    ]
+    improved = await llm.complete(improve_messages, temperature=0.0)
+    try:
+        improved_parsed = json.loads(improved)
+    except Exception:
+        return normalized
+    improved_normalized = _normalize_unified_summary(
+        improved_parsed,
+        fallback_message="Ocena skupia sie na najbardziej prawdopodobnych implikacjach rynkowych.",
+        style=style,
+        geo_focus=geo_focus,
+        continents=continents,
+        query=query,
+        preference_context=preference_context,
+    )
+    if style == "short":
+        if _validate_quick_summary(
+            str(improved_normalized.get("summary") or ""),
+            sources=quick_sources,
+            user_inputs=quick_user_inputs,
+        ):
+            return improved_normalized
+        return {
+            "mode": "quick",
+            "summary": _build_quick_summary(
+                base=improved_parsed if isinstance(improved_parsed, dict) else {},
+                sources=quick_sources,
+                preference_context=preference_context,
+                user_inputs=quick_user_inputs,
+            ),
+        }
+    return improved_normalized
 
 
 class BriefService:
@@ -2514,43 +2570,15 @@ class BriefService:
         query: str | None,
         user_query: str | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
-        # Fetch from all regions in parallel using per-continent quotas.
-        # NA (US) gets the largest quota as it carries most global financial news (Reuters/AP/Bloomberg).
-        # Other regions add local/regional coverage. Failures are skipped gracefully.
-        # Web search (Bing) runs in parallel when BING_SEARCH_API_KEY is configured.
-        axesso_tasks: list[tuple[str, asyncio.Task[list[dict[str, Any]]]]] = []
-        for continent, axesso_regions in CONTINENT_TO_AXESSO_REGIONS.items():
-            quota = REGION_FETCH_QUOTAS.get(continent, 10)
-            primary_region = axesso_regions[0]
-            task = asyncio.create_task(
-                self.list_service.fetch_normalized(s=query, region=primary_region, limit=quota)
-            )
-            axesso_tasks.append((continent, task))
-
-        web_task: asyncio.Task[list[dict[str, Any]]] = asyncio.create_task(
-            self.web_search_service.fetch_items(user_query)
+        # Always fetch from US region — the only one supported by current Axesso plan.
+        # US Yahoo Finance carries global news (Reuters, Bloomberg, AP) covering all regions.
+        # Region-specific filtering is handled downstream by LLM based on user's continent selection.
+        raw_items = await self.list_service.fetch_normalized(
+            s=query,
+            region="US",
+            limit=FETCH_LIMIT_PER_REGION,
         )
-
-        axesso_results = await asyncio.gather(*[t for _, t in axesso_tasks], return_exceptions=True)
-        web_results: list[dict[str, Any]] | Exception = await web_task
-
-        all_items: list[dict[str, Any]] = []
-        total_raw = 0
-        for (continent, _), result in zip(axesso_tasks, axesso_results):
-            if isinstance(result, Exception):
-                logger.warning("Failed to fetch news for continent %s: %s", continent, result)
-                continue
-            total_raw += len(result)
-            all_items.extend(result)
-
-        if isinstance(web_results, Exception):
-            logger.warning("web_search fetch error: %s", web_results)
-        elif web_results:
-            logger.info("web_search enrichment adding %d items", len(web_results))
-            total_raw += len(web_results)
-            all_items.extend(web_results)
-
-        return _dedupe_items(all_items), total_raw
+        return _dedupe_items(raw_items), len(raw_items)
 
     async def run(
         self,
@@ -2649,9 +2677,8 @@ class BriefService:
             items: list[dict[str, Any]] = []
             try:
                 items, fetched_count = await self._fetch_merged_items(
-                    continents=fetch_continents,
+                    continents=normalized_continents,
                     query=axesso_query,
-                    user_query=normalized_query or query,
                 )
             except (NewsDataParsingError, UpstreamNewsProviderError) as exc:
                 list_fetch_status = "failed"

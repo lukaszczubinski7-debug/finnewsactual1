@@ -210,6 +210,7 @@ export type UserPreference = {
   interested_regions: string[];
   interested_topics: string[];
   notes: string | null;
+  market_tickers?: string[] | null;
 };
 
 export type UserPreferenceUpdate = {
@@ -219,4 +220,31 @@ export type UserPreferenceUpdate = {
   interested_regions?: string[];
   interested_topics?: string[];
   notes?: string | null;
+  market_tickers?: string[] | null;
+};
+
+export type MarketQuote = {
+  ticker: string;
+  name: string;
+  price: number | null;
+  change: number | null;
+  change_pct: number | null;
+  currency: string | null;
+  market_state: string;
+  fetched_at: number;
+};
+
+export type MarketInstrument = {
+  ticker: string;
+  name: string;
+  default: boolean;
+};
+
+export type MarketCategory = {
+  name: string;
+  instruments: MarketInstrument[];
+};
+
+export type MarketInstrumentsResponse = {
+  categories: MarketCategory[];
 };

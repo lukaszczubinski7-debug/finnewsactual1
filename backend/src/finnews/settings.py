@@ -41,5 +41,16 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_access_token_expire_minutes: int = Field(default=60 * 24, alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES")
 
+    # CORS
+    allowed_origins: str = Field(default="http://localhost:3000", alias="ALLOWED_ORIGINS")
+
+    # Usage limits (0 = unlimited)
+    daily_brief_limit: int = Field(default=0, alias="DAILY_BRIEF_LIMIT")
+    daily_thread_refresh_limit: int = Field(default=0, alias="DAILY_THREAD_REFRESH_LIMIT")
+
+    # Scheduler
+    scheduler_enabled: bool = Field(default=False, alias="SCHEDULER_ENABLED")
+    scheduler_refresh_cron: str = Field(default="0 6 * * *", alias="SCHEDULER_REFRESH_CRON")
+
 
 settings = Settings()

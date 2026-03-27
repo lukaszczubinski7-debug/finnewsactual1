@@ -13,6 +13,7 @@ from finnews.api.schemas import BriefFocus, BriefRequest, BriefResponse, BriefSo
 from finnews.clients.axesso import mask_key
 from finnews.db.dependencies import get_db
 from finnews.errors import NewsDataParsingError, UpstreamNewsProviderError
+from finnews.middleware.usage_limits import enforce_brief_limit
 from finnews.models import User, UserPreference
 from finnews.normalizers.list_normalizer import find_list_and_path, normalize_items
 from finnews.security import get_current_user_optional
@@ -205,6 +206,7 @@ async def brief(
     request_id = str(uuid4())
     preference_context = ""
     if current_user is not None:
+        enforce_brief_limit(db, current_user.id)
         preference = db.query(UserPreference).filter(UserPreference.user_id == current_user.id).first()
         preference_context = profile_svc.build_preference_context(preference)
     try:

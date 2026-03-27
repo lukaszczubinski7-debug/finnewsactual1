@@ -160,49 +160,37 @@ export default function AuthProfilePanel({
             event.preventDefault();
             void onSavePreferences({
               search_profile_text: searchProfileText || null,
-              response_style: responseStyle || null,
-              interested_assets: textToList(assets),
-              interested_regions: textToList(regions),
-              interested_topics: textToList(topics),
+              response_style: null,
+              interested_assets: [],
+              interested_regions: [],
+              interested_topics: [],
               notes: notes || null,
             });
           }}
         >
           {preferenceLoading ? <p className={styles.helper}>Ladowanie preferencji...</p> : null}
+
+          <p style={{ margin: "0 0 4px", fontSize: 10, color: "#4a6890", letterSpacing: "0.1em", textTransform: "uppercase" }}>Kim jestem</p>
           <textarea
             className={styles.textArea}
-            placeholder="Opis profilu inwestora / kontekst wyszukiwania (np. inwestor GPW, skupiam sie na energetyce i FX)"
+            placeholder="Opisz siebie jako inwestora — kim jesteś, czym się zajmujesz, jaki styl preferujesz (np. inwestor długoterminowy GPW, trader FX, analityk makro)"
             value={searchProfileText}
             onChange={(event) => setSearchProfileText(event.target.value)}
+            style={{ minHeight: 90 }}
           />
-          <input
-            className={styles.smallInput}
-            placeholder="Styl odpowiedzi (np. krotko i rzeczowo, analitycznie, trader)"
-            value={responseStyle}
-            onChange={(event) => setResponseStyle(event.target.value)}
+
+          <p style={{ margin: "12px 0 4px", fontSize: 10, color: "#4a6890", letterSpacing: "0.1em", textTransform: "uppercase" }}>Co mnie interesuje</p>
+          <textarea
+            className={styles.textArea}
+            placeholder="Aktywa, rynki, regiony, tematy — wszystko co chcesz żeby asystent brał pod uwagę (np. GPW, energetyka, USD/PLN, Bliski Wschód, polityka monetarna Fed)"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            style={{ minHeight: 90 }}
           />
-          <input
-            className={styles.smallInput}
-            placeholder="Interesujace aktywa, po przecinku (np. NVDA, LPP.WA, EUR/USD)"
-            value={assets}
-            onChange={(event) => setAssets(event.target.value)}
-          />
-          <input
-            className={styles.smallInput}
-            placeholder="Interesujace regiony, po przecinku (np. Europa, Bliski Wschod)"
-            value={regions}
-            onChange={(event) => setRegions(event.target.value)}
-          />
-          <input
-            className={styles.smallInput}
-            placeholder="Interesujace tematy, po przecinku (np. energia, polityka monetarna, konflikty)"
-            value={topics}
-            onChange={(event) => setTopics(event.target.value)}
-          />
-          <textarea className={styles.textArea} placeholder="Dodatkowe notatki / instrukcje dla asystenta" value={notes} onChange={(event) => setNotes(event.target.value)} />
+
           <div className={styles.miniActions}>
             <button type="submit" className={styles.tinyBtn} disabled={loading}>
-              {loading ? "Zapisywanie..." : "Zapisz preferencje"}
+              {loading ? "Zapisywanie..." : "Zapisz"}
             </button>
             <button type="button" className={styles.tinyBtn} onClick={() => void onDeleteAccount()} disabled={loading}>
               Usun konto

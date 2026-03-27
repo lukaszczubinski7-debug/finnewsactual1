@@ -30,7 +30,7 @@ const ALL_CONTINENTS = ["NA", "EU", "AS", "ME", "SA", "AF", "OC"] as const;
 const initialFormState: BriefRequest = createInitialFormState();
 const AUTH_TOKEN_KEY = "finnews_access_token";
 type AuthMode = "closed" | "login" | "register" | "profile";
-type ActiveTab = "brief" | "market" | "dashboard" | "charts";
+type ActiveTab = "brief" | "dashboard";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMPTY_INPUT_VALIDATION_MESSAGE = "Wpisz pytanie lub uzupelnij profil uzytkownika.";
 
@@ -524,41 +524,15 @@ export default function Page() {
         <button type="button" style={tabBtnStyle("brief")} onClick={() => setActiveTab("brief")}>
           Brief
         </button>
-        <button type="button" style={tabBtnStyle("market")} onClick={() => setActiveTab("market")}>
-          Rynek
-        </button>
         <button type="button" style={tabBtnStyle("dashboard")} onClick={() => setActiveTab("dashboard")}>
           Dashboard
         </button>
-        <button type="button" style={tabBtnStyle("charts")} onClick={() => setActiveTab("charts")}>
-          Wykresy
-        </button>
       </nav>
-
-      {/* Market tab */}
-      {activeTab === "market" && (
-        <div style={{ maxWidth: 1600, margin: "0 auto" }}>
-          <section className={styles.panel} style={{ padding: "18px 20px" }}>
-            <MarketDashboard
-              token={token}
-              preferences={preferences}
-              onPreferencesUpdate={(pref) => setPreferences(pref)}
-            />
-          </section>
-        </div>
-      )}
 
       {/* Dashboard tab */}
       {activeTab === "dashboard" && (
         <div style={{ maxWidth: 1600, margin: "0 auto" }}>
           <Dashboard />
-        </div>
-      )}
-
-      {/* Charts tab */}
-      {activeTab === "charts" && (
-        <div style={{ maxWidth: 1600, margin: "0 auto" }}>
-          <Charts />
         </div>
       )}
 

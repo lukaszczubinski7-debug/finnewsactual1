@@ -66,9 +66,9 @@ export default function Dashboard() {
   return (
     <div style={{ display: "grid", gap: 20, paddingBottom: 40 }}>
 
-      {/* Row 1: Market Overview (full width) */}
+      {/* Market Overview */}
       <div style={sectionStyle}>
-        <div style={sectionHeadStyle}>Rynki Globalne — Indeksy · Waluty · Surowce · Obligacje</div>
+        <div style={sectionHeadStyle}>Rynki Globalne</div>
         <TVWidget
           type="market-overview"
           height={520}
@@ -77,7 +77,6 @@ export default function Dashboard() {
             dateRange: "1D",
             showChart: true,
             locale: "pl",
-            largeChartUrl: "",
             isTransparent: true,
             showSymbolLogo: false,
             showFloatingTooltip: false,
@@ -92,103 +91,58 @@ export default function Dashboard() {
                   { s: "NASDAQ:NDX", d: "NASDAQ 100" },
                   { s: "XETR:DAX", d: "DAX" },
                   { s: "SPREADEX:FTSE", d: "FTSE 100" },
-                  { s: "TVC:DXY", d: "DXY (Dolar)" },
+                  { s: "TVC:DXY", d: "DXY" },
                 ],
                 originalTitle: "Indeksy",
               },
               {
-                title: "Waluty (FX)",
+                title: "Waluty",
                 symbols: [
                   { s: "FX:USDPLN", d: "USD/PLN" },
                   { s: "FX:EURPLN", d: "EUR/PLN" },
                   { s: "FX:EURUSD", d: "EUR/USD" },
                   { s: "FX:USDJPY", d: "USD/JPY" },
-                  { s: "FX:GBPUSD", d: "GBP/USD" },
-                  { s: "FX:USDCHF", d: "USD/CHF" },
                 ],
-                originalTitle: "Waluty (FX)",
+                originalTitle: "Waluty",
               },
               {
                 title: "Surowce",
                 symbols: [
                   { s: "NYMEX:CL1!", d: "WTI Ropa" },
-                  { s: "ICEEUR:B1!", d: "Brent" },
                   { s: "COMEX:GC1!", d: "Złoto" },
-                  { s: "COMEX:SI1!", d: "Srebro" },
-                  { s: "NYMEX:NG1!", d: "Gaz Ziemny" },
-                  { s: "CBOT:ZC1!", d: "Kukurydza" },
+                  { s: "NYMEX:NG1!", d: "Gaz" },
                 ],
                 originalTitle: "Surowce",
               },
               {
-                title: "Obligacje (Yields)",
+                title: "Obligacje",
                 symbols: [
                   { s: "TVC:US10Y", d: "US 10Y" },
                   { s: "TVC:US02Y", d: "US 2Y" },
                   { s: "TVC:DE10Y", d: "Bund 10Y" },
                   { s: "TVC:PL10Y", d: "PL 10Y" },
-                  { s: "TVC:JP10Y", d: "JP 10Y" },
-                  { s: "CBOT:ZB1!", d: "T-Bond Fut." },
                 ],
-                originalTitle: "Obligacje (Yields)",
+                originalTitle: "Obligacje",
               },
             ],
           }}
         />
       </div>
 
-      {/* Row 2: 2-column — Forex Cross Rates + Economic Calendar */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        <div style={sectionStyle}>
-          <div style={sectionHeadStyle}>Krzyżowe Kursy Walut</div>
-          <TVWidget
-            type="forex-cross-rates"
-            height={440}
-            config={{
-              width: "100%",
-              height: 400,
-              currencies: ["EUR", "USD", "PLN", "JPY", "GBP", "CHF", "NOK", "HUF"],
-              isTransparent: true,
-              colorTheme: "dark",
-              locale: "pl",
-            }}
-          />
-        </div>
-
-        <div style={sectionStyle}>
-          <div style={sectionHeadStyle}>Kalendarz Makroekonomiczny</div>
-          <TVWidget
-            type="events"
-            height={440}
-            config={{
-              colorTheme: "dark",
-              isTransparent: true,
-              width: "100%",
-              height: 400,
-              locale: "pl",
-              importanceFilter: "-1,0,1",
-              countryFilter: "us,eu,de,pl,gb,jp,cn",
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Row 3: Screener */}
+      {/* Economic Calendar */}
       <div style={sectionStyle}>
-        <div style={sectionHeadStyle}>Skaner Akcji — Biggest Movers</div>
+        <div style={sectionHeadStyle}>Kalendarz Makroekonomiczny</div>
         <TVWidget
-          type="screener"
-          height={500}
+          type="events"
+          height={420}
           config={{
-            width: "100%",
-            height: 480,
-            defaultColumn: "overview",
-            defaultScreen: "most_capitalized",
-            market: "poland",
-            showToolbar: true,
             colorTheme: "dark",
-            locale: "pl",
             isTransparent: true,
+            width: "100%",
+            height: 400,
+            locale: "pl",
+            importanceFilter: "0,1",
+            countryFilter: "us,eu,de,pl,gb,jp,cn",
           }}
         />
       </div>

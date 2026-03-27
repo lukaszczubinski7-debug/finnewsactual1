@@ -4,23 +4,37 @@ import { useCallback, useEffect, useState } from "react";
 import { getMarketInstruments, getMarketQuotes } from "../lib/api";
 import type { MarketCategory, MarketQuote } from "../lib/types";
 
-const STORAGE_KEY = "dashboard_tickers";
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface DashGroup {
+  id: string;
+  name: string;
+  tickers: string[];
+}
+
+const STORAGE_KEY = "dashboard_groups_v2";
 const REFRESH_MS = 60_000;
 
-function loadSaved(): string[] {
+function loadGroups(): DashGroup[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed.filter((t): t is string => typeof t === "string" && t.length > 0);
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch {}
   return [];
 }
 
-function saveTickers(tickers: string[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
+function saveGroups(groups: DashGroup[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(groups));
 }
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+// ── Formatters ────────────────────────────────────────────────────────────────
 
 function fmtPrice(price: number | null): string {
   if (price === null) return "—";
@@ -44,145 +58,57 @@ function fmtPct(n: number | null): string {
   return `${sign}${n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
-// ── Selector ──────────────────────────────────────────────────────────────────
-
-function Selector({ categories, usedTickers, onSelect, onSelectGroup, onClose, groupMode }: {
-  categories: MarketCategory[];
-  usedTickers: Set<string>;
-  onSelect?: (ticker: string) => void;
-  onSelectGroup?: (cat: MarketCategory) => void;
-  onClose: () => void;
-  groupMode?: boolean;
-}) {
-  const [cat, setCat] = useState<MarketCategory | null>(null);
-
-  return (
-    <div
-      style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(5,9,15,0.88)",
-        display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 18px" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div style={{ width: "100%", maxWidth: 460, border: "1px solid rgba(160,186,222,0.26)",
-        borderRadius: 16, background: "linear-gradient(180deg, rgba(18,26,38,0.99), rgba(11,17,26,0.99))",
-        boxShadow: "0 24px 56px rgba(2,6,13,0.7)" }}>
-        <div style={{ padding: "13px 16px", borderBottom: "1px solid rgba(180,206,236,0.14)",
-          display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {cat && (
-              <button onClick={() => setCat(null)} style={{ background: "none",
-                border: "1px solid rgba(120,160,210,0.3)", borderRadius: 7,
-                color: "#7a9abf", cursor: "pointer", padding: "3px 9px", fontSize: 11 }}>← Wróć</button>
-            )}
-            <span style={{ color: "#d0e4ff", fontSize: 12, fontWeight: 700,
-              letterSpacing: "0.12em", textTransform: "uppercase" }}>
-              {groupMode ? "Dodaj grupę" : cat ? cat.name : "Wybierz kategorię"}
-            </span>
-          </div>
-          <button onClick={onClose} style={{ background: "none",
-            border: "1px solid rgba(120,160,210,0.3)", borderRadius: 7,
-            color: "#7a9abf", cursor: "pointer", padding: "3px 9px", fontSize: 11 }}>✕</button>
-        </div>
-        <div style={{ padding: "12px 16px 16px", display: "grid", gap: 6, maxHeight: 420, overflowY: "auto" }}>
-          {categories.length === 0 && (
-            <p style={{ color: "#3a5a80", fontSize: 12, textAlign: "center", padding: "20px 0", margin: 0 }}>
-              Ładowanie kategorii... sprawdź czy backend działa.
-            </p>
-          )}
-          {groupMode ? (
-            categories.map((c) => {
-              const available = c.instruments.filter((i) => !usedTickers.has(i.ticker)).length;
-              return (
-                <button key={c.name} disabled={available === 0} onClick={() => onSelectGroup?.(c)} style={{
-                  border: `1px solid ${available === 0 ? "rgba(40,70,110,0.3)" : "rgba(100,140,200,0.22)"}`,
-                  borderRadius: 9, padding: "10px 13px",
-                  background: available === 0 ? "rgba(14,22,34,0.4)" : "rgba(16,26,42,0.7)",
-                  color: available === 0 ? "#2a4060" : "#c0d8f4",
-                  fontSize: 12, fontWeight: 600, cursor: available === 0 ? "not-allowed" : "pointer",
-                  textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  {c.name}
-                  <span style={{ color: available === 0 ? "#1e3050" : "#3a6090", fontSize: 11 }}>
-                    {available === 0 ? "dodano" : `+${available}`}
-                  </span>
-                </button>
-              );
-            })
-          ) : !cat && categories.length > 0 ? (
-            categories.map((c) => (
-              <button key={c.name} onClick={() => setCat(c)} style={{
-                border: "1px solid rgba(100,140,200,0.22)", borderRadius: 9,
-                padding: "10px 13px", background: "rgba(16,26,42,0.7)",
-                color: "#c0d8f4", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                textAlign: "left", display: "flex", justifyContent: "space-between" }}>
-                {c.name}
-                <span style={{ color: "#3a5a80", fontSize: 11 }}>{c.instruments.length} →</span>
-              </button>
-            ))
-          ) : cat && !groupMode ? (
-            cat.instruments.map((inst) => {
-              const used = usedTickers.has(inst.ticker);
-              return (
-                <button key={inst.ticker} disabled={used} onClick={() => onSelect(inst.ticker)} style={{
-                  border: `1px solid ${used ? "rgba(40,70,110,0.3)" : "rgba(100,140,200,0.22)"}`,
-                  borderRadius: 9, padding: "9px 13px",
-                  background: used ? "rgba(14,22,34,0.4)" : "rgba(16,26,42,0.7)",
-                  color: used ? "#2a4060" : "#c0d8f4",
-                  fontSize: 12, cursor: used ? "not-allowed" : "pointer",
-                  textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontWeight: 600 }}>{inst.name}</span>
-                  <span style={{ color: used ? "#1e3050" : "#3a6090", fontSize: 10 }}>{inst.ticker}</span>
-                </button>
-              );
-            })
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Tile ──────────────────────────────────────────────────────────────────────
+// ── QuoteTile ─────────────────────────────────────────────────────────────────
 
 function QuoteTile({ quote, onRemove }: { quote: MarketQuote; onRemove: () => void }) {
   const pos = (quote.change ?? 0) >= 0;
-  const neutral = quote.change === null;
-  const clr = neutral ? "#7a9abf" : pos ? "#34d399" : "#f87171";
-  const bgClr = neutral ? "rgba(80,110,150,0.1)" : pos ? "rgba(52,211,153,0.09)" : "rgba(248,113,113,0.09)";
+  const clr = pos ? "#4ade80" : "#f87171";
+  const bgClr = pos ? "rgba(34,90,50,0.5)" : "rgba(90,30,30,0.5)";
 
   return (
-    <div style={{ padding: "16px 18px", position: "relative" }}>
-      <button onClick={onRemove} style={{
-        position: "absolute", top: 8, right: 8,
-        background: "rgba(30,50,80,0.8)", border: "1px solid rgba(120,150,200,0.3)",
-        borderRadius: 6, color: "rgba(180,205,235,0.8)",
-        cursor: "pointer", fontSize: 11, padding: "3px 7px", lineHeight: 1 }}
+    <div style={{
+      padding: "12px 14px", position: "relative",
+      borderBottom: "1px solid rgba(100,140,200,0.08)",
+    }}>
+      <button
+        onClick={onRemove}
+        title="Usuń"
+        style={{
+          position: "absolute", top: 10, right: 10,
+          background: "rgba(30,45,70,0.9)", border: "1px solid rgba(100,130,180,0.3)",
+          borderRadius: 5, color: "rgba(160,190,230,0.8)",
+          cursor: "pointer", fontSize: 11, lineHeight: 1, padding: "3px 7px",
+          fontWeight: 700,
+        }}
         onMouseEnter={(e) => {
           const b = e.currentTarget as HTMLButtonElement;
-          b.style.color = "#f87171"; b.style.background = "rgba(80,25,25,0.85)"; b.style.borderColor = "rgba(248,113,113,0.5)";
+          b.style.color = "#f87171";
+          b.style.background = "rgba(80,20,20,0.9)";
+          b.style.borderColor = "rgba(248,113,113,0.5)";
         }}
         onMouseLeave={(e) => {
           const b = e.currentTarget as HTMLButtonElement;
-          b.style.color = "rgba(180,205,235,0.8)"; b.style.background = "rgba(30,50,80,0.8)"; b.style.borderColor = "rgba(120,150,200,0.3)";
-        }}>
+          b.style.color = "rgba(160,190,230,0.8)";
+          b.style.background = "rgba(30,45,70,0.9)";
+          b.style.borderColor = "rgba(100,130,180,0.3)";
+        }}
+      >
         ✕
       </button>
-      <p style={{ margin: "0 0 2px", color: "#c8dff8", fontSize: 13, fontWeight: 700,
-        paddingRight: 18, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <p style={{ margin: "0 0 1px", fontSize: 13, fontWeight: 700, color: "#d0e4ff", paddingRight: 28 }}>
         {quote.name}
       </p>
-      <p style={{ margin: "0 0 10px", color: "#2a4a70", fontSize: 10,
-        letterSpacing: "0.1em", textTransform: "uppercase" }}>
-        {quote.ticker}{quote.currency && quote.currency !== "USD" ? ` · ${quote.currency}` : ""}
+      <p style={{ margin: "0 0 6px", fontSize: 10, color: "#3a6090", letterSpacing: "0.06em" }}>
+        {quote.ticker}
       </p>
-      <p style={{ margin: "0 0 6px", color: "#e0eeff", fontSize: 22, fontWeight: 700,
-        fontVariantNumeric: "tabular-nums", letterSpacing: "0.01em" }}>
+      <p style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 800, color: "#eef4ff", fontVariantNumeric: "tabular-nums" }}>
         {fmtPrice(quote.price)}
       </p>
-      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         <span style={{ color: clr, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
           {fmtChange(quote.change)}
         </span>
-        <span style={{ background: bgClr, color: clr, borderRadius: 5,
-          padding: "2px 7px", fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+        <span style={{ background: bgClr, color: clr, borderRadius: 5, padding: "2px 7px", fontSize: 12, fontWeight: 600 }}>
           {fmtPct(quote.change_pct)}
         </span>
       </div>
@@ -190,182 +116,383 @@ function QuoteTile({ quote, onRemove }: { quote: MarketQuote; onRemove: () => vo
   );
 }
 
-function EmptyTile({ onAddTicker, onAddGroup }: { onAddTicker: () => void; onAddGroup: () => void }) {
-  const btnStyle = (hover: string): React.CSSProperties => ({
-    flex: 1, padding: "10px 6px", background: "rgba(25,40,65,0.6)",
-    border: "1px solid rgba(100,140,200,0.2)", borderRadius: 8,
-    cursor: "pointer", display: "flex", flexDirection: "column",
-    alignItems: "center", justifyContent: "center", gap: 5,
-    color: "rgba(130,170,220,0.65)", transition: "all 0.15s",
-  });
+// ── Ticker Selector Modal ──────────────────────────────────────────────────────
+
+function TickerSelector({ categories, usedTickers, onSelect, onClose }: {
+  categories: MarketCategory[];
+  usedTickers: Set<string>;
+  onSelect: (ticker: string) => void;
+  onClose: () => void;
+}) {
+  const [cat, setCat] = useState<MarketCategory | null>(null);
 
   return (
-    <div style={{ padding: "12px 14px", display: "flex", gap: 8, minHeight: 110, alignItems: "stretch" }}>
-      <button style={btnStyle("")} onClick={onAddTicker}
-        onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(40,65,110,0.7)"; b.style.color = "rgba(180,215,255,0.9)"; b.style.borderColor = "rgba(140,180,230,0.4)"; }}
-        onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(25,40,65,0.6)"; b.style.color = "rgba(130,170,220,0.65)"; b.style.borderColor = "rgba(100,140,200,0.2)"; }}>
-        <span style={{ fontSize: 20, lineHeight: 1, fontWeight: 300 }}>+</span>
-        <span style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", textAlign: "center" }}>Dodaj ticker</span>
-      </button>
-      <button style={btnStyle("")} onClick={onAddGroup}
-        onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(40,65,110,0.7)"; b.style.color = "rgba(180,215,255,0.9)"; b.style.borderColor = "rgba(140,180,230,0.4)"; }}
-        onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(25,40,65,0.6)"; b.style.color = "rgba(130,170,220,0.65)"; b.style.borderColor = "rgba(100,140,200,0.2)"; }}>
-        <span style={{ fontSize: 20, lineHeight: 1, fontWeight: 300 }}>⊞</span>
-        <span style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", textAlign: "center" }}>Dodaj grupę</span>
-      </button>
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 200, background: "rgba(4,8,14,0.85)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: "linear-gradient(180deg, #0e1a2e 0%, #080f1c 100%)",
+        border: "1px solid rgba(100,140,200,0.25)", borderRadius: 14,
+        padding: "20px", width: 340, maxHeight: "70vh", display: "flex", flexDirection: "column",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <span style={{ color: "#d0e4ff", fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            {cat ? cat.name : "Wybierz kategorię"}
+          </span>
+          <div style={{ display: "flex", gap: 6 }}>
+            {cat && (
+              <button onClick={() => setCat(null)} style={{
+                background: "none", border: "1px solid rgba(80,110,160,0.3)", borderRadius: 6,
+                color: "#4a7ab0", cursor: "pointer", fontSize: 11, padding: "3px 8px" }}>
+                ← Wróć
+              </button>
+            )}
+            <button onClick={onClose} style={{
+              background: "none", border: "1px solid rgba(80,110,160,0.3)", borderRadius: 6,
+              color: "#4a7ab0", cursor: "pointer", fontSize: 11, padding: "3px 8px" }}>
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 5 }}>
+          {categories.length === 0 && (
+            <p style={{ color: "#3a5a80", fontSize: 12, textAlign: "center", padding: "20px 0", margin: 0 }}>
+              Ładowanie...
+            </p>
+          )}
+          {!cat ? categories.map((c) => (
+            <button key={c.name} onClick={() => setCat(c)} style={{
+              border: "1px solid rgba(100,140,200,0.22)", borderRadius: 9, padding: "10px 13px",
+              background: "rgba(16,26,42,0.7)", color: "#c0d8f4",
+              fontSize: 12, fontWeight: 600, cursor: "pointer",
+              textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              {c.name}
+              <span style={{ color: "#3a6090", fontSize: 11 }}>{c.instruments.length} →</span>
+            </button>
+          )) : cat.instruments.map((inst) => {
+            const used = usedTickers.has(inst.ticker);
+            return (
+              <button key={inst.ticker} disabled={used} onClick={() => { onSelect(inst.ticker); onClose(); }} style={{
+                border: `1px solid ${used ? "rgba(30,50,80,0.3)" : "rgba(100,140,200,0.22)"}`,
+                borderRadius: 9, padding: "9px 13px",
+                background: used ? "rgba(10,16,28,0.5)" : "rgba(16,26,42,0.7)",
+                color: used ? "#1e3050" : "#c0d8f4",
+                fontSize: 12, cursor: used ? "not-allowed" : "pointer",
+                textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                {inst.name}
+                <span style={{ color: used ? "#1e3050" : "#3a6090", fontSize: 10 }}>{inst.ticker}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── New Group Modal ────────────────────────────────────────────────────────────
+
+function NewGroupModal({ onConfirm, onClose }: { onConfirm: (name: string) => void; onClose: () => void }) {
+  const [name, setName] = useState("");
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 200, background: "rgba(4,8,14,0.85)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: "linear-gradient(180deg, #0e1a2e 0%, #080f1c 100%)",
+        border: "1px solid rgba(100,140,200,0.25)", borderRadius: 14,
+        padding: "24px", width: 320,
+      }}>
+        <p style={{ margin: "0 0 14px", color: "#d0e4ff", fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+          Nowa grupa
+        </p>
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) { onConfirm(name.trim()); onClose(); } if (e.key === "Escape") onClose(); }}
+          placeholder="Nazwa grupy (np. Surowce)"
+          style={{
+            width: "100%", boxSizing: "border-box", padding: "10px 12px",
+            background: "rgba(10,18,30,0.8)", border: "1px solid rgba(80,120,180,0.3)",
+            borderRadius: 8, color: "#d0e4ff", fontSize: 13, outline: "none",
+            marginBottom: 14,
+          }}
+        />
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: "9px", background: "transparent",
+            border: "1px solid rgba(60,90,140,0.35)", borderRadius: 8,
+            color: "#4a6890", cursor: "pointer", fontSize: 12 }}>
+            Anuluj
+          </button>
+          <button
+            disabled={!name.trim()}
+            onClick={() => { if (name.trim()) { onConfirm(name.trim()); onClose(); } }}
+            style={{
+              flex: 1, padding: "9px", background: name.trim() ? "rgba(50,90,160,0.7)" : "rgba(20,35,60,0.4)",
+              border: "1px solid rgba(80,130,210,0.4)", borderRadius: 8,
+              color: name.trim() ? "#d0e4ff" : "#2a4060", cursor: name.trim() ? "pointer" : "not-allowed",
+              fontSize: 12, fontWeight: 700 }}>
+            Utwórz
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Group Section ──────────────────────────────────────────────────────────────
 
 const COLS = 4;
 
-export default function Dashboard() {
-  const [tickers, setTickers] = useState<string[]>(() => loadSaved());
-  const [quotes, setQuotes] = useState<Map<string, MarketQuote>>(new Map());
-  const [categories, setCategories] = useState<MarketCategory[]>([]);
-  const [selectorMode, setSelectorMode] = useState<"ticker" | "group" | null>(null);
+function GroupSection({
+  group, quotes, allTickers, categories,
+  onAddTicker, onRemoveTicker, onDeleteGroup, onRenameGroup,
+}: {
+  group: DashGroup;
+  quotes: Map<string, MarketQuote>;
+  allTickers: Set<string>;
+  categories: MarketCategory[];
+  onAddTicker: (groupId: string, ticker: string) => void;
+  onRemoveTicker: (groupId: string, ticker: string) => void;
+  onDeleteGroup: (groupId: string) => void;
+  onRenameGroup: (groupId: string, name: string) => void;
+}) {
+  const [showSelector, setShowSelector] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameVal, setRenameVal] = useState(group.name);
 
-  const fetchQuotes = useCallback(async (t: string[]) => {
-    if (!t.length) return;
-    try {
-      const data = await getMarketQuotes(t);
-      setQuotes((prev) => {
-        const next = new Map(prev);
-        data.forEach((q) => next.set(q.ticker, q));
-        return next;
-      });
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    getMarketInstruments()
-      .then((d) => setCategories(d.categories))
-      .catch(() => {
-        // retry once after 2s if first attempt fails
-        setTimeout(() => {
-          getMarketInstruments().then((d) => setCategories(d.categories)).catch(() => {});
-        }, 2000);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (tickers.length) void fetchQuotes(tickers);
-    const id = setInterval(() => { if (tickers.length) void fetchQuotes(tickers); }, REFRESH_MS);
-    return () => clearInterval(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickers]);
-
-  const handleAdd = (ticker: string) => {
-    const next = [...tickers, ticker];
-    setTickers(next);
-    saveTickers(next);
-    setSelectorMode(null);
-    void fetchQuotes([ticker]);
-  };
-
-  const handleAddGroup = (cat: MarketCategory) => {
-    const used = new Set(tickers);
-    const toAdd = cat.instruments.map((i) => i.ticker).filter((t) => !used.has(t));
-    if (!toAdd.length) return;
-    const next = [...tickers, ...toAdd];
-    setTickers(next);
-    saveTickers(next);
-    setSelectorMode(null);
-    void fetchQuotes(toAdd);
-  };
-
-  const handleRemove = (ticker: string) => {
-    const next = tickers.filter((t) => t !== ticker);
-    setTickers(next);
-    saveTickers(next);
-  };
-
-  // Build cells: filled tiles + one empty "add" tile
-  const cells: Array<{ type: "quote"; ticker: string } | { type: "empty" }> = [
-    ...tickers.map((t) => ({ type: "quote" as const, ticker: t })),
-    { type: "empty" as const },
+  const cells: Array<{ type: "quote"; ticker: string } | { type: "add" }> = [
+    ...group.tickers.map((t) => ({ type: "quote" as const, ticker: t })),
+    { type: "add" as const },
   ];
-
-  // Pad to full row
-  while (cells.length % COLS !== 0) cells.push({ type: "empty" as const });
-
-  const handleClearAll = () => {
-    setTickers([]);
-    saveTickers([]);
-    setQuotes(new Map());
-  };
+  while (cells.length % COLS !== 0) cells.push({ type: "add" as const });
 
   return (
-    <div style={{ paddingBottom: 40 }}>
-      {tickers.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-          <button onClick={handleClearAll} style={{
-            background: "none", border: "1px solid rgba(200,80,80,0.3)", borderRadius: 8,
-            color: "rgba(200,100,100,0.6)", cursor: "pointer", fontSize: 11,
-            padding: "4px 12px", letterSpacing: "0.08em", textTransform: "uppercase" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(248,113,113,0.5)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(200,100,100,0.6)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(200,80,80,0.3)"; }}>
-            Wyczyść wszystko
-          </button>
-        </div>
-      )}
+    <div style={{ marginBottom: 28 }}>
+      {/* Group header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, padding: "0 4px" }}>
+        {renaming ? (
+          <input
+            autoFocus
+            value={renameVal}
+            onChange={(e) => setRenameVal(e.target.value)}
+            onBlur={() => { if (renameVal.trim()) onRenameGroup(group.id, renameVal.trim()); setRenaming(false); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { if (renameVal.trim()) onRenameGroup(group.id, renameVal.trim()); setRenaming(false); }
+              if (e.key === "Escape") { setRenameVal(group.name); setRenaming(false); }
+            }}
+            style={{
+              background: "rgba(10,18,30,0.8)", border: "1px solid rgba(80,120,180,0.4)",
+              borderRadius: 6, color: "#d0e4ff", fontSize: 14, fontWeight: 700,
+              padding: "4px 10px", outline: "none",
+            }}
+          />
+        ) : (
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#c0d4f0", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+            {group.name}
+          </span>
+        )}
+        <button onClick={() => { setRenameVal(group.name); setRenaming(true); }} title="Zmień nazwę" style={{
+          background: "none", border: "none", color: "#2a4870", cursor: "pointer", fontSize: 12, padding: "2px 4px" }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#6a9ac8"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#2a4870"; }}>
+          ✏️
+        </button>
+        <button onClick={() => onDeleteGroup(group.id)} title="Usuń grupę" style={{
+          background: "none", border: "none", color: "#2a4870", cursor: "pointer", fontSize: 12, padding: "2px 4px" }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#2a4870"; }}>
+          🗑
+        </button>
+      </div>
+
+      {/* Grid */}
       <div style={{
-        border: "1px solid rgba(140,170,210,0.18)", borderRadius: 14, overflow: "hidden",
-        background: "linear-gradient(180deg, rgba(14,22,34,0.98), rgba(9,15,24,0.98))",
-        display: "grid",
-        gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+        border: "1px solid rgba(140,170,210,0.14)", borderRadius: 14, overflow: "hidden",
+        display: "grid", gridTemplateColumns: `repeat(${COLS}, 1fr)`,
       }}>
         {cells.map((cell, i) => {
-          const col = i % COLS;
-          const row = Math.floor(i / COLS);
-          const totalRows = Math.ceil(cells.length / COLS);
-          const borderRight = col < COLS - 1 ? "1px solid rgba(140,170,210,0.1)" : "none";
-          const borderBottom = row < totalRows - 1 ? "1px solid rgba(140,170,210,0.1)" : "none";
+          const isLastAdd = i === group.tickers.length;
+          const borderRight = (i + 1) % COLS !== 0 ? "1px solid rgba(100,140,200,0.1)" : "none";
+          const borderBottom = i < cells.length - COLS ? "1px solid rgba(100,140,200,0.1)" : "none";
 
+          if (cell.type === "add" && isLastAdd) {
+            return (
+              <div key="add" style={{ borderRight, borderBottom }}>
+                <button onClick={() => setShowSelector(true)} style={{
+                  width: "100%", minHeight: 110, padding: "16px",
+                  background: "rgba(20,35,60,0.25)", border: "none", cursor: "pointer",
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
+                  color: "rgba(100,150,210,0.6)", transition: "all 0.15s",
+                }}
+                  onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(40,70,130,0.4)"; b.style.color = "rgba(160,200,255,0.9)"; }}
+                  onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(20,35,60,0.25)"; b.style.color = "rgba(100,150,210,0.6)"; }}>
+                  <span style={{ fontSize: 24, lineHeight: 1, fontWeight: 300 }}>+</span>
+                  <span style={{ fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase" }}>Dodaj ticker</span>
+                </button>
+              </div>
+            );
+          }
+
+          if (cell.type === "add") {
+            return <div key={`pad-${i}`} style={{ borderRight, borderBottom, minHeight: 110 }} />;
+          }
+
+          const q = quotes.get(cell.ticker);
           return (
-            <div key={i} style={{ borderRight, borderBottom }}>
-              {cell.type === "quote" ? (
-                quotes.get(cell.ticker) ? (
-                  <QuoteTile quote={quotes.get(cell.ticker)!} onRemove={() => handleRemove(cell.ticker)} />
-                ) : (
-                  <div style={{ padding: "16px 18px", color: "#2a4060", fontSize: 12, minHeight: 110,
-                    display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span>{cell.ticker}…</span>
-                    <button onClick={() => handleRemove(cell.ticker)} style={{
-                      background: "none", border: "none", color: "rgba(80,110,150,0.35)",
-                      cursor: "pointer", fontSize: 12, padding: "0 2px" }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(80,110,150,0.35)"; }}>✕</button>
-                  </div>
-                )
-              ) : i === tickers.length ? (
-                <EmptyTile onAddTicker={() => setSelectorMode("ticker")} onAddGroup={() => setSelectorMode("group")} />
+            <div key={cell.ticker} style={{ borderRight, borderBottom }}>
+              {q ? (
+                <QuoteTile quote={q} onRemove={() => onRemoveTicker(group.id, cell.ticker)} />
               ) : (
-                <div style={{ minHeight: 110 }} />
+                <div style={{ padding: "12px 14px", minHeight: 110, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ color: "#2a4060", fontSize: 11 }}>{cell.ticker}<br /><span style={{ fontSize: 10 }}>ładowanie...</span></span>
+                  <button onClick={() => onRemoveTicker(group.id, cell.ticker)} style={{
+                    background: "rgba(30,45,70,0.9)", border: "1px solid rgba(100,130,180,0.3)",
+                    borderRadius: 5, color: "rgba(160,190,230,0.8)", cursor: "pointer",
+                    fontSize: 11, padding: "3px 7px", fontWeight: 700 }}
+                    onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.color = "#f87171"; b.style.background = "rgba(80,20,20,0.9)"; }}
+                    onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.color = "rgba(160,190,230,0.8)"; b.style.background = "rgba(30,45,70,0.9)"; }}>
+                    ✕
+                  </button>
+                </div>
               )}
             </div>
           );
         })}
       </div>
 
-      {selectorMode === "ticker" && (
-        <Selector
+      {showSelector && (
+        <TickerSelector
           categories={categories}
-          usedTickers={new Set(tickers)}
-          onSelect={handleAdd}
-          onClose={() => setSelectorMode(null)}
+          usedTickers={allTickers}
+          onSelect={(ticker) => onAddTicker(group.id, ticker)}
+          onClose={() => setShowSelector(false)}
         />
       )}
-      {selectorMode === "group" && (
-        <Selector
+    </div>
+  );
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────────
+
+export default function Dashboard() {
+  const [groups, setGroups] = useState<DashGroup[]>([]);
+  const [quotes, setQuotes] = useState<Map<string, MarketQuote>>(new Map());
+  const [categories, setCategories] = useState<MarketCategory[]>([]);
+  const [showNewGroup, setShowNewGroup] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setGroups(loadGroups());
+    getMarketInstruments().then((r) => setCategories(r.categories)).catch(() => {});
+  }, []);
+
+  const allTickers = new Set(groups.flatMap((g) => g.tickers));
+
+  const fetchQuotes = useCallback(async (tickers: string[]) => {
+    if (!tickers.length) return;
+    try {
+      const data = await getMarketQuotes(tickers);
+      setQuotes((prev) => {
+        const next = new Map(prev);
+        data.forEach((q) => next.set(q.ticker, q));
+        return next;
+      });
+      setLastRefresh(new Date());
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const tickers = [...allTickers];
+    if (tickers.length) void fetchQuotes(tickers);
+    const id = setInterval(() => {
+      const t = [...new Set(groups.flatMap((g) => g.tickers))];
+      if (t.length) void fetchQuotes(t);
+    }, REFRESH_MS);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups]);
+
+  const updateGroups = (next: DashGroup[]) => { setGroups(next); saveGroups(next); };
+
+  const handleCreateGroup = (name: string) => {
+    updateGroups([...groups, { id: uid(), name, tickers: [] }]);
+  };
+
+  const handleDeleteGroup = (id: string) => {
+    updateGroups(groups.filter((g) => g.id !== id));
+  };
+
+  const handleRenameGroup = (id: string, name: string) => {
+    updateGroups(groups.map((g) => g.id === id ? { ...g, name } : g));
+  };
+
+  const handleAddTicker = (groupId: string, ticker: string) => {
+    updateGroups(groups.map((g) => g.id === groupId ? { ...g, tickers: [...g.tickers, ticker] } : g));
+    void fetchQuotes([ticker]);
+  };
+
+  const handleRemoveTicker = (groupId: string, ticker: string) => {
+    updateGroups(groups.map((g) => g.id === groupId ? { ...g, tickers: g.tickers.filter((t) => t !== ticker) } : g));
+  };
+
+  return (
+    <div style={{ padding: "0 4px" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+        <span style={{ fontSize: 11, color: "#2a4870", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+          Dashboard rynkowy
+        </span>
+        {lastRefresh && (
+          <span style={{ fontSize: 10, color: "#1e3555" }}>
+            · odświeżono {lastRefresh.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+        )}
+      </div>
+
+      {/* Groups */}
+      {groups.length === 0 && (
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "#2a4870" }}>
+          <p style={{ fontSize: 14, marginBottom: 8 }}>Brak grup</p>
+          <p style={{ fontSize: 12 }}>Utwórz pierwszą grupę i dodaj do niej instrumenty</p>
+        </div>
+      )}
+
+      {groups.map((group) => (
+        <GroupSection
+          key={group.id}
+          group={group}
+          quotes={quotes}
+          allTickers={allTickers}
           categories={categories}
-          usedTickers={new Set(tickers)}
-          groupMode
-          onSelectGroup={handleAddGroup}
-          onClose={() => setSelectorMode(null)}
+          onAddTicker={handleAddTicker}
+          onRemoveTicker={handleRemoveTicker}
+          onDeleteGroup={handleDeleteGroup}
+          onRenameGroup={handleRenameGroup}
         />
+      ))}
+
+      {/* Add group button */}
+      <button onClick={() => setShowNewGroup(true)} style={{
+        padding: "10px 20px", background: "rgba(20,36,65,0.6)",
+        border: "1px dashed rgba(80,120,190,0.35)", borderRadius: 10,
+        color: "rgba(100,150,210,0.7)", cursor: "pointer",
+        fontSize: 12, fontWeight: 600, letterSpacing: "0.08em",
+        display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s",
+      }}
+        onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(40,70,130,0.5)"; b.style.color = "rgba(160,200,255,0.9)"; b.style.borderColor = "rgba(120,170,240,0.5)"; }}
+        onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(20,36,65,0.6)"; b.style.color = "rgba(100,150,210,0.7)"; b.style.borderColor = "rgba(80,120,190,0.35)"; }}>
+        <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Dodaj grupę
+      </button>
+
+      {showNewGroup && (
+        <NewGroupModal onConfirm={handleCreateGroup} onClose={() => setShowNewGroup(false)} />
       )}
     </div>
   );

@@ -5,113 +5,103 @@ import { getMarketInstruments, getMarketQuotes } from "../lib/api";
 import type { MarketCategory, MarketQuote } from "../lib/types";
 
 const STORAGE_KEY = "dashboard_tickers";
-const GRID_SIZE = 12;
 const REFRESH_MS = 60_000;
 
-function loadSaved(): (string | null)[] {
+function loadSaved(): string[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as (string | null)[];
+    if (raw) return JSON.parse(raw) as string[];
   } catch {}
-  return Array(GRID_SIZE).fill(null);
+  return [];
 }
 
-function saveTickers(tickers: (string | null)[]) {
+function saveTickers(tickers: string[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tickers));
 }
 
-function fmt(n: number | null, digits = 2) {
-  if (n === null) return "—";
-  return n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
-}
-
-function fmtPrice(price: number | null) {
+function fmtPrice(price: number | null): string {
   if (price === null) return "—";
-  const d = price < 10 ? 4 : price < 1000 ? 2 : 0;
-  return price.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  if (price >= 10000) return price.toLocaleString("pl-PL", { maximumFractionDigits: 0 });
+  if (price >= 100) return price.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (price >= 1) return price.toLocaleString("pl-PL", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  return price.toLocaleString("pl-PL", { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 }
 
-// ── Selector modal ──────────────────────────────────────────────────────────
+function fmtChange(n: number | null): string {
+  if (n === null) return "—";
+  const sign = n >= 0 ? "+" : "";
+  if (Math.abs(n) >= 100) return `${sign}${n.toLocaleString("pl-PL", { maximumFractionDigits: 0 })}`;
+  if (Math.abs(n) >= 1) return `${sign}${n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${sign}${n.toLocaleString("pl-PL", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
+}
 
-interface SelectorProps {
+function fmtPct(n: number | null): string {
+  if (n === null) return "";
+  const sign = n >= 0 ? "+" : "";
+  return `${sign}${n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+}
+
+// ── Selector ─────────────────────────────────────────────────────────────────
+
+function Selector({ categories, usedTickers, onSelect, onClose }: {
   categories: MarketCategory[];
   usedTickers: Set<string>;
   onSelect: (ticker: string) => void;
   onClose: () => void;
-}
-
-function Selector({ categories, usedTickers, onSelect, onClose }: SelectorProps) {
-  const [step, setStep] = useState<"category" | "instrument">("category");
-  const [selectedCat, setSelectedCat] = useState<MarketCategory | null>(null);
+}) {
+  const [cat, setCat] = useState<MarketCategory | null>(null);
 
   return (
     <div
-      style={{
-        position: "fixed", inset: 0, zIndex: 200,
-        background: "rgba(5,9,15,0.88)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "24px 18px",
-      }}
+      style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(5,9,15,0.88)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 18px" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{
-        width: "100%", maxWidth: 480,
-        border: "1px solid rgba(160,186,222,0.28)", borderRadius: 16,
-        background: "linear-gradient(180deg, rgba(20,28,40,0.99), rgba(12,18,26,0.99))",
-        boxShadow: "0 24px 56px rgba(2,6,13,0.7)",
-      }}>
-        {/* header */}
-        <div style={{
-          padding: "14px 18px", borderBottom: "1px solid rgba(180,206,236,0.15)",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {step === "instrument" && (
-              <button onClick={() => setStep("category")} style={{
-                background: "none", border: "1px solid rgba(140,180,220,0.28)",
-                borderRadius: 8, color: "#92a9cb", cursor: "pointer", padding: "3px 9px", fontSize: 12,
-              }}>← Wróć</button>
+      <div style={{ width: "100%", maxWidth: 460, border: "1px solid rgba(160,186,222,0.26)",
+        borderRadius: 16, background: "linear-gradient(180deg, rgba(18,26,38,0.99), rgba(11,17,26,0.99))",
+        boxShadow: "0 24px 56px rgba(2,6,13,0.7)" }}>
+        <div style={{ padding: "13px 16px", borderBottom: "1px solid rgba(180,206,236,0.14)",
+          display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {cat && (
+              <button onClick={() => setCat(null)} style={{ background: "none",
+                border: "1px solid rgba(120,160,210,0.3)", borderRadius: 7,
+                color: "#7a9abf", cursor: "pointer", padding: "3px 9px", fontSize: 11 }}>← Wróć</button>
             )}
-            <span style={{ color: "#d9e8ff", fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-              {step === "category" ? "Wybierz kategorię" : selectedCat?.name}
+            <span style={{ color: "#d0e4ff", fontSize: 12, fontWeight: 700,
+              letterSpacing: "0.12em", textTransform: "uppercase" }}>
+              {cat ? cat.name : "Wybierz kategorię"}
             </span>
           </div>
-          <button onClick={onClose} style={{
-            background: "none", border: "1px solid rgba(140,180,220,0.28)",
-            borderRadius: 8, color: "#92a9cb", cursor: "pointer", padding: "3px 9px", fontSize: 12,
-          }}>✕</button>
+          <button onClick={onClose} style={{ background: "none",
+            border: "1px solid rgba(120,160,210,0.3)", borderRadius: 7,
+            color: "#7a9abf", cursor: "pointer", padding: "3px 9px", fontSize: 11 }}>✕</button>
         </div>
-
-        {/* body */}
-        <div style={{ padding: "14px 18px 18px", display: "grid", gap: 8 }}>
-          {step === "category" ? (
-            categories.map((cat) => (
-              <button key={cat.name} onClick={() => { setSelectedCat(cat); setStep("instrument"); }} style={{
-                border: "1px solid rgba(120,160,210,0.24)", borderRadius: 10,
-                padding: "11px 14px", background: "rgba(20,32,50,0.7)",
-                color: "#c8dcf8", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                textAlign: "left", letterSpacing: "0.04em",
-                display: "flex", justifyContent: "space-between",
-              }}>
-                {cat.name}
-                <span style={{ color: "#4a6a9a", fontSize: 11 }}>{cat.instruments.length} →</span>
+        <div style={{ padding: "12px 16px 16px", display: "grid", gap: 6, maxHeight: 420, overflowY: "auto" }}>
+          {!cat ? (
+            categories.map((c) => (
+              <button key={c.name} onClick={() => setCat(c)} style={{
+                border: "1px solid rgba(100,140,200,0.22)", borderRadius: 9,
+                padding: "10px 13px", background: "rgba(16,26,42,0.7)",
+                color: "#c0d8f4", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                textAlign: "left", display: "flex", justifyContent: "space-between" }}>
+                {c.name}
+                <span style={{ color: "#3a5a80", fontSize: 11 }}>{c.instruments.length} →</span>
               </button>
             ))
           ) : (
-            selectedCat?.instruments.map((inst) => {
+            cat.instruments.map((inst) => {
               const used = usedTickers.has(inst.ticker);
               return (
                 <button key={inst.ticker} disabled={used} onClick={() => onSelect(inst.ticker)} style={{
-                  border: `1px solid ${used ? "rgba(60,90,130,0.3)" : "rgba(120,160,210,0.24)"}`,
-                  borderRadius: 10, padding: "10px 14px",
-                  background: used ? "rgba(20,30,46,0.4)" : "rgba(20,32,50,0.7)",
-                  color: used ? "#3a5070" : "#c8dcf8", fontSize: 13,
-                  cursor: used ? "not-allowed" : "pointer",
-                  textAlign: "left", display: "flex", justifyContent: "space-between",
-                  alignItems: "center",
-                }}>
+                  border: `1px solid ${used ? "rgba(40,70,110,0.3)" : "rgba(100,140,200,0.22)"}`,
+                  borderRadius: 9, padding: "9px 13px",
+                  background: used ? "rgba(14,22,34,0.4)" : "rgba(16,26,42,0.7)",
+                  color: used ? "#2a4060" : "#c0d8f4",
+                  fontSize: 12, cursor: used ? "not-allowed" : "pointer",
+                  textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontWeight: 600 }}>{inst.name}</span>
-                  <span style={{ color: used ? "#2a4060" : "#4a7aaa", fontSize: 11 }}>{inst.ticker}</span>
+                  <span style={{ color: used ? "#1e3050" : "#3a6090", fontSize: 10 }}>{inst.ticker}</span>
                 </button>
               );
             })
@@ -122,98 +112,65 @@ function Selector({ categories, usedTickers, onSelect, onClose }: SelectorProps)
   );
 }
 
-// ── Tile ────────────────────────────────────────────────────────────────────
+// ── Row ───────────────────────────────────────────────────────────────────────
 
-function EmptyTile({ onAdd }: { onAdd: () => void }) {
-  return (
-    <button onClick={onAdd} style={{
-      border: "1px dashed rgba(100,140,190,0.25)", borderRadius: 14,
-      background: "rgba(12,18,28,0.5)", cursor: "pointer",
-      minHeight: 110, display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center", gap: 6,
-      transition: "border-color 0.15s, background 0.15s",
-    }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(100,160,220,0.5)";
-        (e.currentTarget as HTMLButtonElement).style.background = "rgba(20,30,48,0.7)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(100,140,190,0.25)";
-        (e.currentTarget as HTMLButtonElement).style.background = "rgba(12,18,28,0.5)";
-      }}
-    >
-      <span style={{ fontSize: 24, color: "rgba(100,150,200,0.4)", lineHeight: 1 }}>+</span>
-      <span style={{ fontSize: 10, color: "rgba(100,150,200,0.35)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-        Dodaj
-      </span>
-    </button>
-  );
-}
-
-function QuoteTile({ quote, onRemove }: { quote: MarketQuote; onRemove: () => void }) {
+function QuoteRow({ quote, onRemove }: { quote: MarketQuote; onRemove: () => void }) {
   const pos = (quote.change ?? 0) >= 0;
   const neutral = quote.change === null;
-  const clr = neutral ? "#92a9cb" : pos ? "#4ade80" : "#f87171";
-  const bg = neutral ? "rgba(92,120,160,0.1)" : pos ? "rgba(74,222,128,0.07)" : "rgba(248,113,113,0.07)";
+  const clr = neutral ? "#7a9abf" : pos ? "#34d399" : "#f87171";
 
   return (
-    <div style={{
-      border: "1px solid rgba(150,180,220,0.2)", borderRadius: 14,
-      background: "linear-gradient(180deg, rgba(16,24,36,0.98), rgba(10,16,26,0.98))",
-      padding: "12px 14px", position: "relative", minHeight: 110,
-      display: "flex", flexDirection: "column", justifyContent: "space-between",
-    }}>
-      <button onClick={onRemove} title="Usuń" style={{
-        position: "absolute", top: 8, right: 8,
-        background: "none", border: "none", color: "rgba(100,130,170,0.4)",
-        cursor: "pointer", fontSize: 13, lineHeight: 1, padding: 2,
-      }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(100,130,170,0.4)"; }}
-      >✕</button>
-
-      <div>
-        <p style={{ margin: 0, color: "#dce9ff", fontSize: 13, fontWeight: 700, paddingRight: 18,
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto 28px",
+      alignItems: "center", gap: "0 16px",
+      padding: "10px 14px", borderBottom: "1px solid rgba(140,170,210,0.08)" }}>
+      <div style={{ minWidth: 0 }}>
+        <span style={{ color: "#d0e4ff", fontSize: 13, fontWeight: 600,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
           {quote.name}
-        </p>
-        <p style={{ margin: "2px 0 0", color: "#4a6a9a", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+        </span>
+        <span style={{ color: "#3a5a80", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase" }}>
           {quote.ticker}
-        </p>
-      </div>
-
-      <div>
-        <p style={{ margin: "8px 0 4px", color: "#d0e4ff", fontSize: 20, fontWeight: 700,
-          fontVariantNumeric: "tabular-nums", letterSpacing: "0.01em" }}>
-          {fmtPrice(quote.price)}
-          {quote.currency && quote.currency !== "USD" &&
-            <span style={{ fontSize: 11, color: "#4a6a9a", marginLeft: 4 }}>{quote.currency}</span>}
-        </p>
-        <span style={{
-          background: bg, color: clr, borderRadius: 6,
-          padding: "2px 7px", fontSize: 11, fontWeight: 600, fontVariantNumeric: "tabular-nums",
-        }}>
-          {quote.change !== null ? `${quote.change >= 0 ? "+" : ""}${fmt(quote.change)} (${quote.change_pct !== null ? `${quote.change_pct >= 0 ? "+" : ""}${fmt(quote.change_pct)}%` : "—"})` : "—"}
         </span>
       </div>
+      <span style={{ color: "#e0eeff", fontSize: 15, fontWeight: 700,
+        fontVariantNumeric: "tabular-nums", textAlign: "right", whiteSpace: "nowrap" }}>
+        {fmtPrice(quote.price)}
+        {quote.currency && quote.currency !== "USD" &&
+          <span style={{ fontSize: 10, color: "#3a5a80", marginLeft: 4 }}>{quote.currency}</span>}
+      </span>
+      <span style={{ color: clr, fontSize: 12, fontVariantNumeric: "tabular-nums",
+        textAlign: "right", whiteSpace: "nowrap" }}>
+        {fmtChange(quote.change)}
+      </span>
+      <span style={{ color: clr, fontSize: 12, fontWeight: 600,
+        fontVariantNumeric: "tabular-nums", textAlign: "right", whiteSpace: "nowrap",
+        background: neutral ? "rgba(80,110,150,0.1)" : pos ? "rgba(52,211,153,0.09)" : "rgba(248,113,113,0.09)",
+        borderRadius: 5, padding: "2px 6px" }}>
+        {fmtPct(quote.change_pct)}
+      </span>
+      <button onClick={onRemove} style={{ background: "none", border: "none",
+        color: "rgba(80,110,150,0.35)", cursor: "pointer", fontSize: 12,
+        padding: 0, textAlign: "center", lineHeight: 1 }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(80,110,150,0.35)"; }}>
+        ✕
+      </button>
     </div>
   );
 }
 
-// ── Main ────────────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const [slots, setSlots] = useState<(string | null)[]>(() => loadSaved());
+  const [tickers, setTickers] = useState<string[]>(() => loadSaved());
   const [quotes, setQuotes] = useState<Map<string, MarketQuote>>(new Map());
   const [categories, setCategories] = useState<MarketCategory[]>([]);
-  const [addingSlot, setAddingSlot] = useState<number | null>(null);
+  const [showSelector, setShowSelector] = useState(false);
 
-  const activeTickers = slots.filter(Boolean) as string[];
-
-  const fetchQuotes = useCallback(async (tickers: string[]) => {
-    if (!tickers.length) return;
+  const fetchQuotes = useCallback(async (t: string[]) => {
+    if (!t.length) return;
     try {
-      const data = await getMarketQuotes(tickers);
+      const data = await getMarketQuotes(t);
       setQuotes((prev) => {
         const next = new Map(prev);
         data.forEach((q) => next.set(q.ticker, q));
@@ -227,62 +184,78 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (activeTickers.length) void fetchQuotes(activeTickers);
-    const id = setInterval(() => {
-      if (activeTickers.length) void fetchQuotes(activeTickers);
-    }, REFRESH_MS);
+    if (tickers.length) void fetchQuotes(tickers);
+    const id = setInterval(() => { if (tickers.length) void fetchQuotes(tickers); }, REFRESH_MS);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slots]);
+  }, [tickers]);
 
-  const handleAdd = (slotIdx: number, ticker: string) => {
-    const next = [...slots];
-    next[slotIdx] = ticker;
-    setSlots(next);
+  const handleAdd = (ticker: string) => {
+    const next = [...tickers, ticker];
+    setTickers(next);
     saveTickers(next);
-    setAddingSlot(null);
+    setShowSelector(false);
     void fetchQuotes([ticker]);
   };
 
-  const handleRemove = (slotIdx: number) => {
-    const next = [...slots];
-    next[slotIdx] = null;
-    setSlots(next);
+  const handleRemove = (ticker: string) => {
+    const next = tickers.filter((t) => t !== ticker);
+    setTickers(next);
     saveTickers(next);
   };
 
   return (
     <div style={{ paddingBottom: 40 }}>
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
-        gap: 14,
-      }}>
-        {slots.map((ticker, i) =>
-          ticker ? (
-            quotes.get(ticker) ? (
-              <QuoteTile key={i} quote={quotes.get(ticker)!} onRemove={() => handleRemove(i)} />
-            ) : (
-              <div key={i} style={{
-                border: "1px solid rgba(150,180,220,0.15)", borderRadius: 14,
-                background: "rgba(14,20,30,0.6)", minHeight: 110,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <span style={{ color: "#2a4060", fontSize: 11 }}>{ticker}</span>
-              </div>
-            )
-          ) : (
-            <EmptyTile key={i} onAdd={() => setAddingSlot(i)} />
-          )
+      <div style={{ border: "1px solid rgba(140,170,210,0.18)", borderRadius: 14,
+        background: "linear-gradient(180deg, rgba(14,22,34,0.98), rgba(9,15,24,0.98))",
+        overflow: "hidden" }}>
+
+        {/* Column headers */}
+        {tickers.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto 28px",
+            gap: "0 16px", padding: "8px 14px",
+            borderBottom: "1px solid rgba(140,170,210,0.14)",
+            background: "rgba(10,16,26,0.6)" }}>
+            <span style={{ color: "#2a4a6a", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Instrument</span>
+            <span style={{ color: "#2a4a6a", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", textAlign: "right" }}>Cena</span>
+            <span style={{ color: "#2a4a6a", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", textAlign: "right" }}>Zmiana</span>
+            <span style={{ color: "#2a4a6a", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", textAlign: "right" }}>%</span>
+            <span />
+          </div>
         )}
+
+        {/* Rows */}
+        {tickers.map((ticker) => {
+          const q = quotes.get(ticker);
+          return q ? (
+            <QuoteRow key={ticker} quote={q} onRemove={() => handleRemove(ticker)} />
+          ) : (
+            <div key={ticker} style={{ padding: "10px 14px", borderBottom: "1px solid rgba(140,170,210,0.08)",
+              color: "#2a4060", fontSize: 12 }}>
+              {ticker} <span style={{ fontSize: 10 }}>ładowanie...</span>
+            </div>
+          );
+        })}
+
+        {/* Add row */}
+        <button onClick={() => setShowSelector(true)} style={{
+          width: "100%", padding: "11px 14px", background: "none",
+          border: "none", borderTop: tickers.length > 0 ? "1px dashed rgba(80,120,170,0.18)" : "none",
+          cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+          color: "rgba(80,130,190,0.45)", fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase" }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(120,170,230,0.7)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "rgba(80,130,190,0.45)"; }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
+          <span>Dodaj instrument</span>
+        </button>
       </div>
 
-      {addingSlot !== null && (
+      {showSelector && (
         <Selector
           categories={categories}
-          usedTickers={new Set(slots.filter(Boolean) as string[])}
-          onSelect={(ticker) => handleAdd(addingSlot, ticker)}
-          onClose={() => setAddingSlot(null)}
+          usedTickers={new Set(tickers)}
+          onSelect={handleAdd}
+          onClose={() => setShowSelector(false)}
         />
       )}
     </div>

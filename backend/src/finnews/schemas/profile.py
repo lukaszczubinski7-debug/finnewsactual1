@@ -10,6 +10,7 @@ class UserPreferenceResponse(BaseModel):
     interested_regions: list[str] = Field(default_factory=list)
     interested_topics: list[str] = Field(default_factory=list)
     notes: str | None = None
+    market_tickers: list[str] | None = None
 
 
 class UserPreferenceUpdateRequest(BaseModel):
@@ -19,3 +20,4 @@ class UserPreferenceUpdateRequest(BaseModel):
     interested_regions: list[str] | None = None
     interested_topics: list[str] | None = None
     notes: str | None = None
+    market_tickers: list[str] | None = None

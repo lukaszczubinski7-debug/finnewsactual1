@@ -20,6 +20,7 @@ class UserPreference(Base):
     interested_regions: Mapped[list[str] | dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     interested_topics: Mapped[list[str] | dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    market_tickers: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

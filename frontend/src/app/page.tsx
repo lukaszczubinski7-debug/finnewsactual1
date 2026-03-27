@@ -7,6 +7,7 @@ import AuthProfilePanel from "../components/AuthProfilePanel";
 import BriefResult from "../components/BriefResult";
 import FooterActions from "../components/FooterActions";
 import HeaderBar from "../components/HeaderBar";
+import MarketDashboard from "../components/MarketDashboard";
 import ThreadDetail from "../components/ThreadDetail";
 import ThreadsPanel from "../components/ThreadsPanel";
 import ThreadSuggestionBanner from "../components/ThreadSuggestion";
@@ -27,6 +28,7 @@ const ALL_CONTINENTS = ["NA", "EU", "AS", "ME", "SA", "AF", "OC"] as const;
 const initialFormState: BriefRequest = createInitialFormState();
 const AUTH_TOKEN_KEY = "finnews_access_token";
 type AuthMode = "closed" | "login" | "register" | "profile";
+type ActiveTab = "brief" | "market";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMPTY_INPUT_VALIDATION_MESSAGE = "Wpisz pytanie lub uzupelnij profil uzytkownika.";
 
@@ -45,6 +47,7 @@ function hasUsefulProfile(preference: UserPreference | null): boolean {
 }
 
 export default function Page() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>("brief");
   const [mainQuestion, setMainQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
@@ -346,7 +349,47 @@ export default function Page() {
     }
   };
 
-  const leftColumn = (
+  const tabBar = (
+    <div
+      style={{
+        display: "flex",
+        gap: 0,
+        border: "1px solid rgba(160,186,222,0.24)",
+        borderRadius: 12,
+        overflow: "hidden",
+        background: "rgba(14,20,30,0.7)",
+        alignSelf: "start",
+        width: "fit-content",
+      }}
+    >
+      {(["brief", "market"] as ActiveTab[]).map((tab) => (
+        <button
+          key={tab}
+          onClick={() => setActiveTab(tab)}
+          style={{
+            border: "none",
+            borderRight: tab === "brief" ? "1px solid rgba(160,186,222,0.18)" : "none",
+            padding: "9px 22px",
+            cursor: "pointer",
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: activeTab === tab ? "#f0f6ff" : "#5a7498",
+            background:
+              activeTab === tab
+                ? "linear-gradient(180deg, rgba(60,88,132,0.9), rgba(36,56,88,0.95))"
+                : "transparent",
+            transition: "color 0.15s, background 0.15s",
+          }}
+        >
+          {tab === "brief" ? "Brief" : "Rynek"}
+        </button>
+      ))}
+    </div>
+  );
+
+  const briefContent = (
     <div style={{ display: "grid", gap: 22 }}>
       <section className={styles.panel}>
         <HeaderBar />
@@ -434,6 +477,23 @@ export default function Page() {
         />
       ) : null}
 
+    </div>
+  );
+
+  const leftColumn = (
+    <div style={{ display: "grid", gap: 22 }}>
+      {tabBar}
+      {activeTab === "brief" ? (
+        briefContent
+      ) : (
+        <section className={styles.panel} style={{ padding: "18px 20px" }}>
+          <MarketDashboard
+            token={token}
+            preferences={preferences}
+            onPreferencesUpdate={(pref) => setPreferences(pref)}
+          />
+        </section>
+      )}
     </div>
   );
 

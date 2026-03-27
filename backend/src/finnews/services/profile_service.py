@@ -40,6 +40,9 @@ class ProfileService:
             preference.interested_topics = _as_string_list(updates["interested_topics"])
         if "notes" in updates:
             preference.notes = updates["notes"]
+        if "market_tickers" in updates:
+            tickers = updates["market_tickers"]
+            preference.market_tickers = ",".join(_as_string_list(tickers)) if tickers else None
 
         db.add(preference)
         db.commit()

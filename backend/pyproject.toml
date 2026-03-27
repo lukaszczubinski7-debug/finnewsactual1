@@ -17,6 +17,7 @@ dependencies = [
   "beautifulsoup4>=4.12",
   "psycopg2-binary>=2.9",
   "apscheduler>=3.10",
+  "yfinance>=0.2.40",
 ]
 
 [tool.uv]

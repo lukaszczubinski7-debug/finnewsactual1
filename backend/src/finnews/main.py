@@ -10,6 +10,7 @@ from finnews.api.responses import UTF8JSONResponse
 from finnews.api.routes import router
 from finnews.api.routes_auth import router as auth_router
 from finnews.api.routes_profile import router as profile_router
+from finnews.api.routes_market import router as market_router
 from finnews.api.routes_threads import router as threads_router
 from finnews.scheduler import start_scheduler, stop_scheduler
 from finnews.settings import settings
@@ -27,6 +28,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(market_router)
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(threads_router)

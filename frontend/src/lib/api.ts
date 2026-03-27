@@ -6,6 +6,8 @@ import type {
   BriefResponse,
   LoginRequest,
   LoginResponse,
+  MarketInstrumentsResponse,
+  MarketQuote,
   RegisterRequest,
   Thread,
   ThreadCreateRequest,
@@ -20,6 +22,8 @@ const AUTH_LOGIN_ENDPOINT = "/api/auth/login";
 const AUTH_ME_ENDPOINT = "/api/auth/me";
 const PROFILE_PREFERENCES_ENDPOINT = "/api/profile/preferences";
 const THREADS_ENDPOINT = "/api/threads";
+const MARKET_QUOTES_ENDPOINT = "/api/market/quotes";
+const MARKET_INSTRUMENTS_ENDPOINT = "/api/market/instruments";
 
 function parseTickers(tickers: string): string[] {
   return tickers
@@ -304,4 +308,21 @@ export async function suggestThread(token: string, brief: BriefResponse): Promis
   const payload = await parseJsonSafe(response);
   if (!response.ok) throw parseApiError(payload, response.status);
   return payload as ThreadSuggestion;
+}
+
+export async function getMarketQuotes(tickers?: string[]): Promise<MarketQuote[]> {
+  const url = tickers && tickers.length > 0
+    ? `${MARKET_QUOTES_ENDPOINT}?tickers=${encodeURIComponent(tickers.join(","))}`
+    : MARKET_QUOTES_ENDPOINT;
+  const response = await fetch(url, { cache: "no-store" });
+  const payload = await parseJsonSafe(response);
+  if (!response.ok) throw parseApiError(payload, response.status);
+  return payload as MarketQuote[];
+}
+
+export async function getMarketInstruments(): Promise<MarketInstrumentsResponse> {
+  const response = await fetch(MARKET_INSTRUMENTS_ENDPOINT, { cache: "no-store" });
+  const payload = await parseJsonSafe(response);
+  if (!response.ok) throw parseApiError(payload, response.status);
+  return payload as MarketInstrumentsResponse;
 }

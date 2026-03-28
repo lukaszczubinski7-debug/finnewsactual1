@@ -366,3 +366,42 @@
     text-align: left;
   }
 }
+
+@media (max-width: 768px) {
+  .panel {
+    border-radius: 12px;
+  }
+
+  .header {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .headerTitle {
+    font-size: 14px;
+    letter-spacing: 0.08em;
+  }
+
+  .headerSub {
+    font-size: 9px;
+  }
+
+  .clockLine {
+    font-size: 11px;
+    text-align: right;
+  }
+
+  .primaryBtn {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .secondaryBtn {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .footer {
+    flex-direction: column;
+  }
+}

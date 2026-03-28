@@ -254,6 +254,14 @@ export default function Dashboard() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [modal, setModal] = useState<{ type: "newBoard" } | { type: "renameBoard"; id: string; current: string } | null>(null);
   const [renamingTab, setRenamingTab] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     const b = loadBoards(); setBoards(b);
@@ -379,8 +387,8 @@ export default function Dashboard() {
         {lastRefresh && <span style={{ marginLeft: "auto", fontSize: 10, color: "#1a2e4a", paddingBottom: 6 }}>· {lastRefresh.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}</span>}
       </div>
 
-      {/* 2-column layout */}
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }} onDragEnd={() => setDragId(null)}>
+      {/* 2-column layout (single column on mobile) */}
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 16, alignItems: "flex-start" }} onDragEnd={() => setDragId(null)}>
         <Column colIdx={0} groups={groups.filter((g) => g.col === 0)} {...sharedProps} />
         <Column colIdx={1} groups={groups.filter((g) => g.col === 1)} {...sharedProps} />
       </div>

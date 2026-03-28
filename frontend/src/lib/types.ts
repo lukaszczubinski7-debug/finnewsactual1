@@ -248,3 +248,27 @@ export type MarketCategory = {
 export type MarketInstrumentsResponse = {
   categories: MarketCategory[];
 };
+
+export type YoutubeSource = {
+  id: number;
+  video_id: string;
+  video_url: string;
+  title: string | null;
+  channel_name: string | null;
+  language: string | null;
+  summary: string | null;
+  status: "pending" | "processing" | "ready" | "error";
+  error_msg: string | null;
+  created_at: string;
+  processed_at: string | null;
+  channel_db_id: number | null;
+};
+
+export type YoutubeChannel = {
+  id: number;
+  channel_id: string;
+  channel_url: string;
+  name: string | null;
+  last_fetched_at: string | null;
+  created_at: string;
+};

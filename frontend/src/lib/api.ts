@@ -14,6 +14,8 @@ import type {
   ThreadSuggestion,
   UserPreference,
   UserPreferenceUpdate,
+  YoutubeChannel,
+  YoutubeSource,
 } from "./types";
 
 const BRIEF_ENDPOINT = "/api/brief";
@@ -325,4 +327,60 @@ export async function getMarketInstruments(): Promise<MarketInstrumentsResponse>
   const payload = await parseJsonSafe(response);
   if (!response.ok) throw parseApiError(payload, response.status);
   return payload as MarketInstrumentsResponse;
+}
+
+// ── YouTube ────────────────────────────────────────────────────────────────
+
+const YT_SOURCES = "/api/youtube/sources";
+const YT_CHANNELS = "/api/youtube/channels";
+
+export async function getYoutubeSources(token: string): Promise<YoutubeSource[]> {
+  const r = await fetch(YT_SOURCES, { cache: "no-store", headers: authHeaders(token) });
+  const p = await parseJsonSafe(r);
+  if (!r.ok) throw parseApiError(p, r.status);
+  return p as YoutubeSource[];
+}
+
+export async function postYoutubeSource(token: string, videoUrl: string): Promise<YoutubeSource> {
+  const r = await fetch(YT_SOURCES, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8", ...authHeaders(token) },
+    body: JSON.stringify({ video_url: videoUrl }),
+  });
+  const p = await parseJsonSafe(r);
+  if (!r.ok) throw parseApiError(p, r.status);
+  return p as YoutubeSource;
+}
+
+export async function deleteYoutubeSource(token: string, id: number): Promise<void> {
+  const r = await fetch(`${YT_SOURCES}/${id}`, { method: "DELETE", headers: authHeaders(token) });
+  if (!r.ok) { const p = await parseJsonSafe(r); throw parseApiError(p, r.status); }
+}
+
+export async function getYoutubeChannels(token: string): Promise<YoutubeChannel[]> {
+  const r = await fetch(YT_CHANNELS, { cache: "no-store", headers: authHeaders(token) });
+  const p = await parseJsonSafe(r);
+  if (!r.ok) throw parseApiError(p, r.status);
+  return p as YoutubeChannel[];
+}
+
+export async function postYoutubeChannel(token: string, channelUrl: string): Promise<YoutubeChannel> {
+  const r = await fetch(YT_CHANNELS, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8", ...authHeaders(token) },
+    body: JSON.stringify({ channel_url: channelUrl }),
+  });
+  const p = await parseJsonSafe(r);
+  if (!r.ok) throw parseApiError(p, r.status);
+  return p as YoutubeChannel;
+}
+
+export async function deleteYoutubeChannel(token: string, id: number): Promise<void> {
+  const r = await fetch(`${YT_CHANNELS}/${id}`, { method: "DELETE", headers: authHeaders(token) });
+  if (!r.ok) { const p = await parseJsonSafe(r); throw parseApiError(p, r.status); }
+}
+
+export async function refreshYoutubeChannels(token: string): Promise<void> {
+  const r = await fetch(`${YT_CHANNELS}/refresh`, { method: "POST", headers: authHeaders(token) });
+  if (!r.ok) { const p = await parseJsonSafe(r); throw parseApiError(p, r.status); }
 }

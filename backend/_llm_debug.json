@@ -1,0 +1,32 @@
+{
+  "headline": "Apple zwiększa wypłatę dywidend, Tesla i Nvidia bez nowych danych",
+  "mode": "standard",
+  "items": [
+    {
+      "title": "Apple – wypłata dywidend i pozycja rynkowa",
+      "body": "Apple jest drugą co do wielkości spółką na świecie pod względem wartości rynkowej i posiada jedną z największych rezerw gotówkowych wśród amerykańskich firm publicznych. Firma regularnie wypłaca dywidendy, co czyni ją atrakcyjną dla inwestorów poszukujących dochodu pasywnego. Berkshire Hathaway otrzymała znaczące wpływy z dywidend Apple w 2026 roku."
+    },
+    {
+      "title": "Tesla – brak nowych danych finansowych w ostatnim tygodniu",
+      "body": "W ciągu ostatnich 7 dni nie opublikowano istotnych informacji finansowych ani korporacyjnych dotyczących Tesli, które mogłyby wpłynąć na notowania spółki na rynku amerykańskim."
+    },
+    {
+      "title": "Nvidia – brak nowych raportów i komunikatów",
+      "body": "Nvidia nie przedstawiła nowych danych ani oficjalnych komunikatów w ostatnim tygodniu, które miałyby bezpośredni wpływ na notowania akcji na giełdzie w Ameryce Północnej."
+    }
+  ],
+  "sources": [
+    {
+      "title": "Does Apple pay dividends? A history of rewarding shareholders",
+      "url": "https://www.thestreet.com/investing/stocks/apple-dividends",
+      "publisher": "TheStreet",
+      "published_at": "2026-03-13T18:05:00.000Z"
+    },
+    {
+      "title": "You Won't Believe How Much Money Berkshire Hathaway Gets From Apple Dividends",
+      "url": "https://www.fool.com/investing/2026/03/13/how-much-berkshire-hathaway-apple-dividend/",
+      "publisher": "Motley Fool",
+      "published_at": "2026-03-13T14:27:00.000Z"
+    }
+  ]
+}

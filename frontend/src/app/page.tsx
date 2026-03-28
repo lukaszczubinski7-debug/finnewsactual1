@@ -7,6 +7,7 @@ import AuthProfilePanel from "../components/AuthProfilePanel";
 import BriefResult from "../components/BriefResult";
 import Charts from "../components/Charts";
 import Dashboard from "../components/Dashboard";
+import YoutubePanel from "../components/YoutubePanel";
 import FooterActions from "../components/FooterActions";
 import HeaderBar from "../components/HeaderBar";
 import MarketDashboard from "../components/MarketDashboard";
@@ -30,7 +31,7 @@ const ALL_CONTINENTS = ["NA", "EU", "AS", "ME", "SA", "AF", "OC"] as const;
 const initialFormState: BriefRequest = createInitialFormState();
 const AUTH_TOKEN_KEY = "finnews_access_token";
 type AuthMode = "closed" | "login" | "register" | "profile";
-type ActiveTab = "brief" | "dashboard";
+type ActiveTab = "brief" | "dashboard" | "media";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMPTY_INPUT_VALIDATION_MESSAGE = "Wpisz pytanie lub uzupelnij profil uzytkownika.";
 
@@ -566,6 +567,11 @@ export default function Page() {
         onMouseLeave={(e) => { if (activeTab !== "dashboard") (e.currentTarget as HTMLButtonElement).style.color = "#4a6890"; }}>
         Dashboard
       </button>
+      <button type="button" style={navBtnStyle("media")} onClick={() => setActiveTab("media")}
+        onMouseEnter={(e) => { if (activeTab !== "media") (e.currentTarget as HTMLButtonElement).style.color = "#8ab4d8"; }}
+        onMouseLeave={(e) => { if (activeTab !== "media") (e.currentTarget as HTMLButtonElement).style.color = "#4a6890"; }}>
+        Media
+      </button>
     </aside>
   );
 
@@ -605,6 +611,19 @@ export default function Page() {
         {activeTab === "dashboard" && (
           <div style={{ flex: 1, minWidth: 0 }}>
             <Dashboard />
+          </div>
+        )}
+
+        {/* Media */}
+        {activeTab === "media" && (
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {token ? (
+              <YoutubePanel token={token} />
+            ) : (
+              <div style={{ color: "#3a5a80", fontSize: 13, textAlign: "center", padding: "60px 20px" }}>
+                Zaloguj się żeby korzystać z zakładki Media.
+              </div>
+            )}
           </div>
         )}
 

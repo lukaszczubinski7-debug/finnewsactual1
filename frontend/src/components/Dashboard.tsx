@@ -86,38 +86,54 @@ function TickerRow({ quote, ticker, onRemove }: { quote?: MarketQuote; ticker: s
 
 // ── Ticker Selector ───────────────────────────────────────────────────────────
 
-function TickerSelector({ categories, usedTickers, onSelect, onClose }: {
+function TickerSelector({ categories, usedTickers, onSelect, onClose, anchorRect }: {
   categories: MarketCategory[]; usedTickers: Set<string>; onSelect: (t: string) => void; onClose: () => void;
+  anchorRect: DOMRect;
 }) {
   const [cat, setCat] = useState<MarketCategory | null>(null);
+
+  // Position dropdown below the anchor button, flip up if too close to bottom
+  const spaceBelow = window.innerHeight - anchorRect.bottom;
+  const dropTop = spaceBelow > 260 ? anchorRect.bottom + 4 : anchorRect.top - 264;
+  const dropLeft = Math.min(anchorRect.left, window.innerWidth - 290);
+
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(4,8,14,0.85)", display: "flex", alignItems: "center", justifyContent: "center" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ background: "linear-gradient(180deg,#0e1a2e,#080f1c)", border: "1px solid rgba(100,140,200,0.25)", borderRadius: 14, padding: "18px", width: 320, maxHeight: "65vh", display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <span style={{ color: "#d0e4ff", fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>{cat ? cat.name : "Kategoria"}</span>
-          <div style={{ display: "flex", gap: 5 }}>
-            {cat && <button onClick={() => setCat(null)} style={{ background: "none", border: "1px solid rgba(60,90,140,0.3)", borderRadius: 5, color: "#4a7ab0", cursor: "pointer", fontSize: 10, padding: "2px 7px" }}>← wróć</button>}
-            <button onClick={onClose} style={{ background: "none", border: "1px solid rgba(60,90,140,0.3)", borderRadius: 5, color: "#4a7ab0", cursor: "pointer", fontSize: 10, padding: "2px 7px" }}>✕</button>
+    <>
+      <div style={{ position: "fixed", inset: 0, zIndex: 199 }} onClick={onClose} />
+      <div style={{
+        position: "fixed", zIndex: 200,
+        top: dropTop, left: dropLeft, width: 280,
+        background: "linear-gradient(180deg,#0e1a2e,#080f1c)",
+        border: "1px solid rgba(100,140,200,0.25)", borderRadius: 10,
+        padding: "10px", maxHeight: 260, display: "flex", flexDirection: "column",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <span style={{ color: "#d0e4ff", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            {cat ? cat.name : "Kategoria"}
+          </span>
+          <div style={{ display: "flex", gap: 4 }}>
+            {cat && <button onClick={() => setCat(null)} style={{ background: "none", border: "1px solid rgba(60,90,140,0.3)", borderRadius: 4, color: "#4a7ab0", cursor: "pointer", fontSize: 9, padding: "2px 6px" }}>← wróć</button>}
+            <button onClick={onClose} style={{ background: "none", border: "1px solid rgba(60,90,140,0.3)", borderRadius: 4, color: "#4a7ab0", cursor: "pointer", fontSize: 9, padding: "2px 6px" }}>✕</button>
           </div>
         </div>
-        <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-          {categories.length === 0 && <p style={{ color: "#3a5a80", fontSize: 11, textAlign: "center", padding: "16px 0", margin: 0 }}>Ładowanie...</p>}
+        <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
+          {categories.length === 0 && <p style={{ color: "#3a5a80", fontSize: 11, textAlign: "center", padding: "12px 0", margin: 0 }}>Ładowanie...</p>}
           {!cat ? categories.map((c) => (
-            <button key={c.name} onClick={() => setCat(c)} style={{ border: "1px solid rgba(80,120,180,0.2)", borderRadius: 8, padding: "9px 12px", background: "rgba(14,22,36,0.7)", color: "#b0cce8", fontSize: 11, fontWeight: 600, cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}>
+            <button key={c.name} onClick={() => setCat(c)} style={{ border: "1px solid rgba(80,120,180,0.2)", borderRadius: 6, padding: "7px 10px", background: "rgba(14,22,36,0.7)", color: "#b0cce8", fontSize: 11, fontWeight: 600, cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}>
               {c.name}<span style={{ color: "#2a4870", fontSize: 10 }}>{c.instruments.length} →</span>
             </button>
           )) : cat.instruments.map((inst) => {
             const used = usedTickers.has(inst.ticker);
             return (
-              <button key={inst.ticker} disabled={used} onClick={() => { onSelect(inst.ticker); onClose(); }} style={{ border: `1px solid ${used ? "rgba(20,40,70,0.3)" : "rgba(80,120,180,0.2)"}`, borderRadius: 8, padding: "8px 12px", background: used ? "rgba(8,14,24,0.4)" : "rgba(14,22,36,0.7)", color: used ? "#1e3050" : "#b0cce8", fontSize: 11, cursor: used ? "not-allowed" : "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}>
+              <button key={inst.ticker} disabled={used} onClick={() => { onSelect(inst.ticker); onClose(); }} style={{ border: `1px solid ${used ? "rgba(20,40,70,0.3)" : "rgba(80,120,180,0.2)"}`, borderRadius: 6, padding: "7px 10px", background: used ? "rgba(8,14,24,0.4)" : "rgba(14,22,36,0.7)", color: used ? "#1e3050" : "#b0cce8", fontSize: 11, cursor: used ? "not-allowed" : "pointer", textAlign: "left", display: "flex", justifyContent: "space-between" }}>
                 {inst.name}<span style={{ fontSize: 10, color: used ? "#1a2e4a" : "#2a4870" }}>{inst.ticker}</span>
               </button>
             );
           })}
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -150,7 +166,7 @@ function GroupCard({ group, quotes, allTickers, categories, isDragging, onAddTic
   isDragging: boolean; onAddTicker: (id: string, t: string) => void; onRemoveTicker: (id: string, t: string) => void;
   onDeleteGroup: (id: string) => void; onRenameGroup: (id: string, n: string) => void;
 }) {
-  const [showSel, setShowSel] = useState(false);
+  const [selAnchor, setSelAnchor] = useState<DOMRect | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [renameVal, setRenameVal] = useState(group.name);
   return (
@@ -172,10 +188,10 @@ function GroupCard({ group, quotes, allTickers, categories, isDragging, onAddTic
       {group.tickers.map((ticker) => (
         <TickerRow key={ticker} ticker={ticker} quote={quotes.get(ticker)} onRemove={() => onRemoveTicker(group.id, ticker)} />
       ))}
-      <button onClick={() => setShowSel(true)} style={{ margin: "8px 10px 10px", padding: "6px 10px", background: "rgba(16,30,56,0.5)", border: "1px dashed rgba(60,100,170,0.3)", borderRadius: 7, color: "rgba(70,120,190,0.6)", cursor: "pointer", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s" }} onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(30,55,110,0.5)"; b.style.color = "rgba(130,180,255,0.9)"; b.style.borderColor = "rgba(100,160,240,0.45)"; }} onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(16,30,56,0.5)"; b.style.color = "rgba(70,120,190,0.6)"; b.style.borderColor = "rgba(60,100,170,0.3)"; }}>
+      <button onClick={(e) => setSelAnchor((e.currentTarget as HTMLButtonElement).getBoundingClientRect())} style={{ margin: "8px 10px 10px", padding: "6px 10px", background: "rgba(16,30,56,0.5)", border: "1px dashed rgba(60,100,170,0.3)", borderRadius: 7, color: "rgba(70,120,190,0.6)", cursor: "pointer", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s" }} onMouseEnter={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(30,55,110,0.5)"; b.style.color = "rgba(130,180,255,0.9)"; b.style.borderColor = "rgba(100,160,240,0.45)"; }} onMouseLeave={(e) => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "rgba(16,30,56,0.5)"; b.style.color = "rgba(70,120,190,0.6)"; b.style.borderColor = "rgba(60,100,170,0.3)"; }}>
         <span style={{ fontSize: 14, lineHeight: 1 }}>+</span> Dodaj ticker
       </button>
-      {showSel && <TickerSelector categories={categories} usedTickers={allTickers} onSelect={(t) => onAddTicker(group.id, t)} onClose={() => setShowSel(false)} />}
+      {selAnchor && <TickerSelector categories={categories} usedTickers={allTickers} onSelect={(t) => { onAddTicker(group.id, t); setSelAnchor(null); }} onClose={() => setSelAnchor(null)} anchorRect={selAnchor} />}
     </div>
   );
 }

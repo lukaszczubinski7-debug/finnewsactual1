@@ -9,11 +9,12 @@ export const runtime = "nodejs";
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
+  const { id } = await params;
   const auth = request.headers.get("Authorization") || "";
   try {
-    const res = await fetch(`${backendBaseUrl}/youtube/sources/${params.id}`, {
+    const res = await fetch(`${backendBaseUrl}/youtube/sources/${id}`, {
       method: "DELETE",
       headers: { Authorization: auth },
     });

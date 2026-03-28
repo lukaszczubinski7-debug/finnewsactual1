@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     daily_brief_limit: int = Field(default=0, alias="DAILY_BRIEF_LIMIT")
     daily_thread_refresh_limit: int = Field(default=0, alias="DAILY_THREAD_REFRESH_LIMIT")
 
+    # Twitter / X (twitterapi.io)
+    twitterapi_io_key: str = Field(default="", alias="TWITTERAPI_IO_KEY")
+
     # Scheduler
     scheduler_enabled: bool = Field(default=False, alias="SCHEDULER_ENABLED")
     scheduler_refresh_cron: str = Field(default="0 6 * * *", alias="SCHEDULER_REFRESH_CRON")

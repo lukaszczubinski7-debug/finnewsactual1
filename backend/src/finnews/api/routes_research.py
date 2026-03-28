@@ -13,7 +13,10 @@ _service = ResearchService()
 @router.post("", response_model=ResearchResponse)
 async def post_research(req: ResearchRequest) -> ResearchResponse:
     """Run a research query using LLM tool calling."""
-    result = await _service.run(req.query)
+    result = await _service.run(
+        query=req.query,
+        sources_trust_level=req.sources_trust_level,
+    )
     return ResearchResponse(
         report=result["report"],
         tools_used=result["tools_used"],

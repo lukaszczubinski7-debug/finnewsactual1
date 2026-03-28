@@ -9,13 +9,15 @@ from openai import AsyncOpenAI
 
 from finnews.clients.scraper import scrape_article
 from finnews.clients.serper import SerperClient
+from finnews.clients.twitter import TwitterClient, _MAX_CALLS_PER_SESSION
 from finnews.clients.youtube import extract_video_id, get_transcript
 from finnews.clients.market import get_quotes
 from finnews.settings import settings
+from finnews.trusted_sources import apply_trust_to_query, get_sources_context_for_prompt
 
 logger = logging.getLogger(__name__)
 
-_TOOLS: list[dict[str, Any]] = [
+_BASE_TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
@@ -102,17 +104,60 @@ _TOOLS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_twitter",
+            "description": (
+                "Przeszukaj Twitter/X w poszukiwaniu aktualnych tweetów, opinii inwestorów i analityków. "
+                "Używaj do pytań o nastroje rynkowe, opinie ekspertów, spekulacje giełdowe, "
+                "bieżące komentarze do wydarzeń finansowych. "
+                "Limit: max 2 wywołania na zapytanie, max 10 tweetów na wywołanie."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Zapytanie wyszukiwania po angielsku lub polsku. Możesz użyć operatorów: from:handle, #hashtag.",
+                    },
+                    "query_type": {
+                        "type": "string",
+                        "enum": ["Latest", "Top"],
+                        "description": "Latest = najnowsze tweety, Top = najpopularniejsze. Domyślnie Latest.",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
 ]
 
-_SYSTEM_PROMPT = (
+_BASE_SYSTEM_PROMPT = (
     "Jesteś asystentem badawczym dla analityków finansowych i inwestorów. "
     "Korzystaj z dostępnych narzędzi żeby odpowiedzieć na pytanie użytkownika. "
     "Możesz wywołać kilka narzędzi jednocześnie. "
     "Na końcu sformułuj odpowiedź po polsku — konkretnie, rzeczowo i użytecznie. "
     "Jeśli masz dane rynkowe, podaj aktualne kursy z kontekstem. "
     "Jeśli masz wyniki wyszukiwania, powołaj się na źródła. "
+    "Jeśli masz tweety, cytuj autorów (@handle) i daty. "
     "Nie wymyślaj faktów — opieraj się tylko na danych z narzędzi."
 )
+
+
+def _build_tools(twitter_available: bool) -> list[dict[str, Any]]:
+    """Zwraca listę narzędzi — search_twitter tylko jeśli Twitter API jest dostępne."""
+    if twitter_available:
+        return _BASE_TOOLS
+    return [t for t in _BASE_TOOLS if t["function"]["name"] != "search_twitter"]
+
+
+def _build_system_prompt(trust_level: float) -> str:
+    """Buduje system prompt z opcjonalną sekcją zweryfikowanych źródeł."""
+    sources_context = get_sources_context_for_prompt(trust_level)
+    if sources_context:
+        return _BASE_SYSTEM_PROMPT + "\n\n" + sources_context
+    return _BASE_SYSTEM_PROMPT
 
 
 class ResearchService:
@@ -120,8 +165,15 @@ class ResearchService:
         self.client = AsyncOpenAI(api_key=settings.openai_api_key)
         self.model = settings.openai_model
         self.serper = SerperClient()
+        self.twitter = TwitterClient()
 
-    async def _execute_tool(self, name: str, args: dict[str, Any]) -> str:
+    async def _execute_tool(
+        self,
+        name: str,
+        args: dict[str, Any],
+        trust_level: float,
+        twitter_calls: list[int],  # mutable counter
+    ) -> str:
         try:
             if name == "search_web":
                 results = await self.serper.search(
@@ -153,6 +205,30 @@ class ResearchService:
                 text = await scrape_article(args["url"])
                 return json.dumps({"content": text[:5000] if text else ""})
 
+            elif name == "search_twitter":
+                # Limit wywołań
+                if twitter_calls[0] >= _MAX_CALLS_PER_SESSION:
+                    return json.dumps({
+                        "error": f"Limit wywołań search_twitter ({_MAX_CALLS_PER_SESSION}/sesję) osiągnięty."
+                    })
+
+                if not self.twitter.available:
+                    return json.dumps({"error": "Twitter API niedostępne (brak klucza)."})
+
+                twitter_calls[0] += 1
+
+                # Zastosuj trust level — filtruj lub nie
+                raw_query = args["query"]
+                query = apply_trust_to_query(raw_query, trust_level)
+                query_type = args.get("query_type", "Latest")
+
+                tweets = await self.twitter.search(query, query_type=query_type)
+
+                if not tweets:
+                    return json.dumps({"tweets": [], "note": "Brak wyników dla zapytania."})
+
+                return json.dumps({"tweets": tweets}, ensure_ascii=False)
+
             else:
                 return json.dumps({"error": f"Unknown tool: {name}"})
 
@@ -160,24 +236,30 @@ class ResearchService:
             logger.warning("research tool %s error: %s", name, e)
             return json.dumps({"error": str(e)})
 
-    async def run(self, query: str) -> dict[str, Any]:
+    async def run(self, query: str, sources_trust_level: float = 0.5) -> dict[str, Any]:
         """
         Run a research query using LLM tool calling.
         Returns {"report": str, "tools_used": list[str], "sources": list[dict]}.
+
+        sources_trust_level (0.0-1.0): kontroluje jak mocno LLM preferuje zweryfikowane źródła.
         """
+        system_prompt = _build_system_prompt(sources_trust_level)
+        tools = _build_tools(self.twitter.available)
+
         messages: list[dict[str, Any]] = [
-            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": query},
         ]
 
         tools_used: list[str] = []
         sources: list[dict[str, str]] = []
+        twitter_calls: list[int] = [0]  # mutable counter shared with _execute_tool
 
         # First call — LLM picks tools
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=messages,  # type: ignore[arg-type]
-            tools=_TOOLS,  # type: ignore[arg-type]
+            tools=tools,  # type: ignore[arg-type]
             tool_choice="auto",
             temperature=0.3,
         )
@@ -219,7 +301,7 @@ class ResearchService:
 
         # Execute tools in parallel
         results = await asyncio.gather(*[
-            self._execute_tool(name, args)
+            self._execute_tool(name, args, sources_trust_level, twitter_calls)
             for _, name, args in tool_tasks
         ])
 
@@ -242,6 +324,19 @@ class ResearchService:
                                     "url": item["link"],
                                     "provider": item.get("source", ""),
                                 })
+                except Exception:
+                    pass
+
+            elif name == "search_twitter":
+                try:
+                    data = json.loads(result_str)
+                    for tweet in data.get("tweets", [])[:5]:
+                        if tweet.get("url"):
+                            sources.append({
+                                "title": f"@{tweet.get('author_handle', '?')}: {tweet.get('text', '')[:80]}...",
+                                "url": tweet["url"],
+                                "provider": "X (Twitter)",
+                            })
                 except Exception:
                     pass
 

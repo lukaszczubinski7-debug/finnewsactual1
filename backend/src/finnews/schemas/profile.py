@@ -11,6 +11,7 @@ class UserPreferenceResponse(BaseModel):
     interested_topics: list[str] = Field(default_factory=list)
     notes: str | None = None
     market_tickers: list[str] | None = None
+    sources_trust_level: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
 class UserPreferenceUpdateRequest(BaseModel):
@@ -21,3 +22,4 @@ class UserPreferenceUpdateRequest(BaseModel):
     interested_topics: list[str] | None = None
     notes: str | None = None
     market_tickers: list[str] | None = None
+    sources_trust_level: float | None = Field(default=None, ge=0.0, le=1.0)

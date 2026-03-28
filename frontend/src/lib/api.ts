@@ -332,14 +332,18 @@ export async function getMarketInstruments(): Promise<MarketInstrumentsResponse>
 
 // ── Research ───────────────────────────────────────────────────────────────
 
-export async function postResearch(query: string, token?: string): Promise<ResearchResponse> {
+export async function postResearch(
+  query: string,
+  token?: string,
+  sources_trust_level?: number,
+): Promise<ResearchResponse> {
   const r = await fetch("/api/research", {
     method: "POST",
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       ...authHeaders(token),
     },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, sources_trust_level: sources_trust_level ?? 0.5 }),
   });
   const p = await parseJsonSafe(r);
   if (!r.ok) throw parseApiError(p, r.status);

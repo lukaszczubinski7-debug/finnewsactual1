@@ -6,6 +6,7 @@ import AuthProfilePanel from "../components/AuthProfilePanel";
 import Dashboard from "../components/Dashboard";
 import HeaderBar from "../components/HeaderBar";
 import ResearchPanel from "../components/ResearchPanel";
+import SourcesSettingsPanel from "../components/SourcesSettingsPanel";
 import StructuredBriefsPanel from "../components/StructuredBriefsPanel";
 import ThreadDetail from "../components/ThreadDetail";
 import ThreadsPanel from "../components/ThreadsPanel";
@@ -22,8 +23,9 @@ import type {
 } from "../lib/types";
 
 const AUTH_TOKEN_KEY = "finnews_access_token";
+const TRUST_LEVEL_KEY = "finnews_trust_level";
 type AuthMode = "closed" | "login" | "register" | "profile";
-type ActiveTab = "centrum" | "dashboard";
+type ActiveTab = "centrum" | "dashboard" | "zrodla";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Page() {
@@ -38,6 +40,10 @@ export default function Page() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [preferences, setPreferences] = useState<UserPreference | null>(null);
   const [preferenceLoading, setPreferenceLoading] = useState(false);
+
+  // Sources trust level (0.0–1.0)
+  const [trustLevel, setTrustLevel] = useState<number>(0.5);
+  const [trustSaving, setTrustSaving] = useState(false);
 
   // Research
   const [researchQuery, setResearchQuery] = useState("");
@@ -66,6 +72,12 @@ export default function Page() {
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // Load trust level from localStorage
+  useEffect(() => {
+    const saved = window.localStorage.getItem(TRUST_LEVEL_KEY);
+    if (saved !== null) setTrustLevel(parseFloat(saved));
   }, []);
 
   // Restore session
@@ -162,6 +174,23 @@ export default function Page() {
     } finally { setAuthLoading(false); }
   };
 
+  // ── Trust level handler ────────────────────────────────────────────────
+
+  const handleTrustChange = (v: number) => {
+    setTrustLevel(v);
+    window.localStorage.setItem(TRUST_LEVEL_KEY, String(v));
+  };
+
+  const handleTrustSave = async () => {
+    if (!token) return;
+    setTrustSaving(true);
+    try {
+      await patchPreferences(token, { sources_trust_level: trustLevel });
+    } catch { /* silent */ } finally {
+      setTrustSaving(false);
+    }
+  };
+
   // ── Research handler ───────────────────────────────────────────────────
 
   const handleResearch = async (overrideQuery?: string) => {
@@ -171,7 +200,7 @@ export default function Page() {
     setResearchResult(null);
     setThreadSuggestion(null);
     try {
-      const result = await postResearch(q, token ?? undefined);
+      const result = await postResearch(q, token ?? undefined, trustLevel);
       setResearchResult(result);
       if (token && q) {
         const fakeBrief = {
@@ -375,6 +404,26 @@ export default function Page() {
         onMouseLeave={(e) => { if (activeTab !== "dashboard") (e.currentTarget as HTMLButtonElement).style.color = "#4a6890"; }}>
         Dashboard
       </button>
+      <button type="button" style={navBtnStyle("zrodla")} onClick={() => setActiveTab("zrodla")}
+        onMouseEnter={(e) => { if (activeTab !== "zrodla") (e.currentTarget as HTMLButtonElement).style.color = "#8ab4d8"; }}
+        onMouseLeave={(e) => { if (activeTab !== "zrodla") (e.currentTarget as HTMLButtonElement).style.color = "#4a6890"; }}>
+        Źródła
+      </button>
+
+      {/* Trust level mini indicator w sidebarze */}
+      <div style={{ marginTop: "auto", padding: "12px 8px 0" }}>
+        <div style={{ fontSize: 8, color: "#3a5068", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+          Zaufanie do źródeł
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ flex: 1, height: 3, background: "rgba(30,50,80,0.6)", borderRadius: 2, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.round(trustLevel * 100)}%`, background: "#4a8ac8", borderRadius: 2, transition: "width 0.3s" }} />
+          </div>
+          <span style={{ fontSize: 8, color: "#4a6890", minWidth: 24, textAlign: "right" }}>
+            {Math.round(trustLevel * 100)}%
+          </span>
+        </div>
+      </div>
     </aside>
   );
 
@@ -397,20 +446,20 @@ export default function Page() {
       </span>
 
       <div style={{ flex: 1, display: "flex", gap: 6 }}>
-        {(["centrum", "dashboard"] as ActiveTab[]).map((tab) => (
+        {(["centrum", "dashboard", "zrodla"] as ActiveTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
-              flex: 1, fontSize: 9, padding: "6px 8px",
+              flex: 1, fontSize: 9, padding: "6px 4px",
               borderRadius: 7, border: "none", cursor: "pointer",
-              fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase",
+              fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
               background: activeTab === tab ? "rgba(60,96,160,0.65)" : "rgba(20,32,54,0.7)",
               color: activeTab === tab ? "#f0f6ff" : "#4a6890",
               transition: "all 0.15s",
             }}
           >
-            {tab === "centrum" ? "Centrum" : "Dashboard"}
+            {tab === "centrum" ? "Centrum" : tab === "dashboard" ? "Rynki" : "Źródła"}
           </button>
         ))}
       </div>
@@ -533,6 +582,43 @@ export default function Page() {
         {activeTab === "dashboard" && (
           <div style={{ flex: 1, minWidth: 0, width: "100%" }}>
             <Dashboard />
+          </div>
+        )}
+
+        {/* ── Źródła tab ─────────────────────────────────────────────── */}
+        {activeTab === "zrodla" && (
+          <div style={{ flex: 1, minWidth: 0, width: "100%", maxWidth: 680 }}>
+            <div className={styles.panel} style={{ padding: "20px 20px 28px" }}>
+              <div style={{ marginBottom: 20, display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#c8deff" }}>
+                    Zweryfikowane Źródła
+                  </div>
+                  <div style={{ fontSize: 9, color: "#3a5068", letterSpacing: "0.06em", marginTop: 3 }}>
+                    Kontroluj jak LLM korzysta z zaufanych autorów
+                  </div>
+                </div>
+                {token && (
+                  <button
+                    onClick={() => void handleTrustSave()}
+                    disabled={trustSaving}
+                    style={{
+                      fontSize: 9, padding: "5px 12px", borderRadius: 7, cursor: trustSaving ? "not-allowed" : "pointer",
+                      background: "rgba(40,70,130,0.6)", border: "1px solid rgba(80,130,200,0.3)",
+                      color: "#90c0f0", letterSpacing: "0.06em", textTransform: "uppercase",
+                      opacity: trustSaving ? 0.5 : 1,
+                    }}
+                  >
+                    {trustSaving ? "Zapisywanie..." : "Zapisz"}
+                  </button>
+                )}
+              </div>
+              <SourcesSettingsPanel
+                trustLevel={trustLevel}
+                onTrustChange={handleTrustChange}
+                saving={trustSaving}
+              />
+            </div>
           </div>
         )}
 

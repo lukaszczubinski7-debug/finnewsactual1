@@ -212,6 +212,7 @@ export type UserPreference = {
   interested_topics: string[];
   notes: string | null;
   market_tickers?: string[] | null;
+  sources_trust_level?: number;
 };
 
 export type UserPreferenceUpdate = {
@@ -222,6 +223,7 @@ export type UserPreferenceUpdate = {
   interested_topics?: string[];
   notes?: string | null;
   market_tickers?: string[] | null;
+  sources_trust_level?: number | null;
 };
 
 export type MarketQuote = {
@@ -252,6 +254,7 @@ export type MarketInstrumentsResponse = {
 
 export type ResearchRequest = {
   query: string;
+  sources_trust_level?: number;
 };
 
 export type ResearchSource = {

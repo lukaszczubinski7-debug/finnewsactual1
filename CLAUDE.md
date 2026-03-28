@@ -69,10 +69,18 @@ finnewsactual1/
 
 ### Przepływ danych
 
-1. Użytkownik wpisuje pytanie → `postBrief()` → `POST /api/brief`
-2. Frontend proxy (`/app/api/brief/route.ts`) → backend `POST /brief`
-3. Backend pobiera newsy (Axesso + Serper), przetwarza przez LLM (OpenAI), zwraca brief
-4. Dla danych rynkowych: frontend → `/api/market/quotes` (proxy) → backend `/market/quotes` → yfinance
+1. (Research) Użytkownik wpisuje pytanie → `postResearch()` → `POST /api/research`
+2. Backend wywołuje OpenAI z tool calling → LLM dobiera narzędzia (search_web, get_market_data, get_youtube_transcript, fetch_webpage) → wykonuje je → LLM syntetyzuje odpowiedź po polsku
+3. Dla danych rynkowych: frontend → `/api/market/quotes` (proxy) → backend `/market/quotes` → yfinance
+4. (YouTube) Użytkownik dodaje film → transkrypcja przez youtube-transcript-api → podsumowanie LLM
+
+### Zakładki frontendowe
+
+- **Centrum informacji** (ActiveTab: "centrum"):
+  - Sub-zakładka "🔍 Research": ResearchPanel — textarea + wyniki z tool calling
+  - Sub-zakładka "📺 Media": YoutubePanel — filmy i kanały YouTube
+  - ThreadsPanel na prawej kolumnie (dla zalogowanych)
+- **Dashboard** (ActiveTab: "dashboard"): wieloplanszowy dashboard rynkowy z grupami tickerów
 
 ---
 
@@ -93,6 +101,12 @@ finnewsactual1/
 | `/threads/{id}` | DELETE | Bearer | Usuń wątek |
 | `/market/quotes` | GET | — | Live ceny instrumentów (yfinance, cache 60s) |
 | `/market/instruments` | GET | — | Lista dostępnych instrumentów wg kategorii |
+| `/youtube/sources` | GET / POST | Bearer | Lista filmów / dodaj film |
+| `/youtube/sources/{id}` | DELETE | Bearer | Usuń film |
+| `/youtube/channels` | GET / POST | Bearer | Lista kanałów / dodaj kanał |
+| `/youtube/channels/{id}` | DELETE | Bearer | Usuń kanał |
+| `/youtube/channels/refresh` | POST | Bearer | Pobierz nowe filmy ze wszystkich kanałów |
+| `/research` | POST | — | Research z LLM tool calling (search_web, get_market_data, get_youtube_transcript, fetch_webpage) |
 
 ---
 

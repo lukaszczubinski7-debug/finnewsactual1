@@ -29,8 +29,8 @@ export default function HeaderBar() {
   return (
     <header className={styles.header}>
       <div>
-        <h1 className={styles.headerTitle}>Geopolityczny Brief Operacyjny</h1>
-        <p className={styles.headerSub}>Panel strategiczny / tryb terminala</p>
+        <h1 className={styles.headerTitle}>Research Terminal</h1>
+        <p className={styles.headerSub}>Centrum informacji / AI research</p>
       </div>
       <div className={styles.clockLine}>
         {hudDate} | {clock}

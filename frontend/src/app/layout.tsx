@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { IBM_Plex_Mono } from "next/font/google";
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin", "latin-ext"],
+  weight: ["300", "400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: "Fin News",
-  description: "Financial news brief",
+  title: "Research Terminal",
+  description: "AI research & geopolitical intelligence",
 };
 
 type RootLayoutProps = {
@@ -12,23 +21,20 @@ type RootLayoutProps = {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="pl">
+    <html lang="pl" className={ibmPlexMono.variable}>
       <body
         style={{
           margin: 0,
-          backgroundColor: "#eef4f8",
-          color: "#10253f",
+          backgroundColor: "#080d14",
+          color: "#a0bcd8",
+          fontFamily: "var(--font-mono), 'IBM Plex Mono', 'Courier New', monospace",
+          fontFeatureSettings: '"kern" 1, "liga" 0',
+          WebkitFontSmoothing: "antialiased",
+          MozOsxFontSmoothing: "grayscale",
+          overflowX: "hidden",
         }}
       >
-        <div
-          style={{
-            maxWidth: 1200,
-            margin: "0 auto",
-            padding: "0 16px",
-          }}
-        >
-          {children}
-        </div>
+        {children}
       </body>
     </html>
   );

@@ -183,7 +183,7 @@ function GroupCard({ group, quotes, allTickers, categories, isDragging, onAddTic
   return (
     <div style={{ background: isDragging ? "rgba(20,36,70,0.6)" : "rgba(255,255,255,0.025)", border: `1px solid ${isDragging ? "rgba(80,130,220,0.4)" : "rgba(120,160,210,0.1)"}`, borderRadius: 10, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: isDragging ? "0 8px 32px rgba(0,0,0,0.5)" : "0 1px 8px rgba(0,0,0,0.15)", transition: "box-shadow 0.15s, border-color 0.15s" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 10px", borderBottom: "1px solid rgba(100,140,200,0.08)", background: "rgba(255,255,255,0.02)", cursor: "grab" }}>
-        <span style={{ color: "#1e3555", fontSize: 14, marginRight: 2, userSelect: "none" }}>⠿</span>
+        <span style={{ color: "#1e3555", fontSize: 11, marginRight: 2, userSelect: "none" }}>≡</span>
         {renaming ? (
           <input autoFocus value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
             onBlur={() => { if (renameVal.trim()) onRenameGroup(group.id, renameVal.trim()); setRenaming(false); }}
@@ -192,7 +192,7 @@ function GroupCard({ group, quotes, allTickers, categories, isDragging, onAddTic
         ) : (
           <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: "#90b8e0", letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{group.name}</span>
         )}
-        <button onClick={(e) => { e.stopPropagation(); setRenameVal(group.name); setRenaming(true); }} style={{ background: "none", border: "none", color: "#1e3555", cursor: "pointer", fontSize: 11, padding: "0 2px" }} onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#6a9ac8"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#1e3555"; }}>✏</button>
+        <button onClick={(e) => { e.stopPropagation(); setRenameVal(group.name); setRenaming(true); }} style={{ background: "none", border: "none", color: "#1e3555", cursor: "pointer", fontSize: 11, padding: "0 2px" }} onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#6a9ac8"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#1e3555"; }}>~</button>
         <button onClick={(e) => { e.stopPropagation(); onDeleteGroup(group.id); }} style={{ background: "none", border: "none", color: "#1e3555", cursor: "pointer", fontSize: 11, padding: "0 2px" }} onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#1e3555"; }}>✕</button>
       </div>
       {group.tickers.length === 0 && <div style={{ padding: "14px 10px", color: "#1e3555", fontSize: 11, textAlign: "center" }}>Brak tickerów</div>}

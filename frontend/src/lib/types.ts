@@ -5,7 +5,8 @@ export type BriefContext =
   | "Stopy / banki centralne"
   | "Surowce / energia"
   | "Crypto"
-  | "Polska / GPW";
+  | "Polska / GPW"
+  | "Technologia";
 
 export type ContinentCode = "NA" | "EU" | "AS" | "ME" | "SA" | "AF" | "OC";
 
@@ -247,6 +248,22 @@ export type MarketCategory = {
 
 export type MarketInstrumentsResponse = {
   categories: MarketCategory[];
+};
+
+export type ResearchRequest = {
+  query: string;
+};
+
+export type ResearchSource = {
+  title: string;
+  url: string;
+  provider: string;
+};
+
+export type ResearchResponse = {
+  report: string;
+  tools_used: string[];
+  sources: ResearchSource[];
 };
 
 export type YoutubeSource = {

@@ -13,6 +13,7 @@ from finnews.api.routes_profile import router as profile_router
 from finnews.api.routes_market import router as market_router
 from finnews.api.routes_threads import router as threads_router
 from finnews.api.routes_youtube import router as youtube_router
+from finnews.api.routes_research import router as research_router
 from finnews.scheduler import start_scheduler, stop_scheduler
 from finnews.settings import settings
 
@@ -34,6 +35,7 @@ app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(threads_router)
 app.include_router(youtube_router)
+app.include_router(research_router)
 
 
 @app.on_event("startup")

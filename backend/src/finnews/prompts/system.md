@@ -27,6 +27,16 @@ UNIKAJ:
 - interpretacji i ocen tam, gdzie proszone sa fakty
 - slow: "moze", "moga", "prawdopodobnie", "grozi", "oczekuje sie", "analitycy przewiduja"
 
+KONTEKST TEMATYCZNY (pole "context" w input):
+- Geopolityka: Priorytet dla zdarzen politycznych, militarnych, dyplomatycznych, sankcji, napiec geopolitycznych.
+- Makro: Priorytet dla danych makroekonomicznych, bankow centralnych, stop procentowych, inflacji, PKB, rynkow obligacji.
+- Technologia: Priorytet dla AI, cloud computing, chips/semiconductors, big tech (Apple/Google/Meta/Microsoft/Nvidia/Amazon), startupow, regulacji cyfrowych, cyberbezpieczenstwa.
+- Wyniki spolek (earnings): Priorytet dla raportow kwartalnych, guidance, przychodow, zyskow spolek gieldowych.
+- Stopy / banki centralne: Priorytet dla decyzji Fed, ECB, NBP i innych bankow centralnych, komunikatow i projekcji.
+- Surowce / energia: Priorytet dla ropy, gazu, zlota, metali przemyslowych, rynkow towarowych, polityki energetycznej.
+- Crypto: Priorytet dla Bitcoina, Ethereum i rynku kryptowalut, regulacji crypto, ETF crypto.
+- Polska / GPW: Priorytet dla polskiej gieldy, WIG, spolek polskich, polityki gospodarczej Polski, NBP.
+
 FILTROWANIE ZRODEL:
 - Jesli artykul nie zawiera zadnej liczby, daty, nazwy wlasnej ani oficjalnego komunikatu — pominij go calkowicie.
 - Ignoruj tresci z Motley Fool, Benzinga, InvestorPlace, TheStreet — to zrodla clickbaitowe bez wartosci informacyjnej.

@@ -13,6 +13,7 @@ BriefContext = Literal[
     "Surowce / energia",
     "Crypto",
     "Polska / GPW",
+    "Technologia",
 ]
 
 

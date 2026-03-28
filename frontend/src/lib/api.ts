@@ -9,6 +9,7 @@ import type {
   MarketInstrumentsResponse,
   MarketQuote,
   RegisterRequest,
+  ResearchResponse,
   Thread,
   ThreadCreateRequest,
   ThreadSuggestion,
@@ -94,7 +95,7 @@ export async function postBrief(req: BriefRequest, token?: string): Promise<Brie
     continents: ensureContinents(req.continents),
     tickers: parseTickers(req.tickers),
     query: req.query.trim() || null,
-    context: "Geopolityka" as const,
+    context: req.context ?? "Geopolityka",
     geo_focus: req.geo_focus.trim() || null,
     debug: req.debug,
     window_hours: req.window_hours,
@@ -327,6 +328,22 @@ export async function getMarketInstruments(): Promise<MarketInstrumentsResponse>
   const payload = await parseJsonSafe(response);
   if (!response.ok) throw parseApiError(payload, response.status);
   return payload as MarketInstrumentsResponse;
+}
+
+// ── Research ───────────────────────────────────────────────────────────────
+
+export async function postResearch(query: string, token?: string): Promise<ResearchResponse> {
+  const r = await fetch("/api/research", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      ...authHeaders(token),
+    },
+    body: JSON.stringify({ query }),
+  });
+  const p = await parseJsonSafe(r);
+  if (!r.ok) throw parseApiError(p, r.status);
+  return p as ResearchResponse;
 }
 
 // ── YouTube ────────────────────────────────────────────────────────────────

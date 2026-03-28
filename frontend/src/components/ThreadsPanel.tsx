@@ -105,8 +105,8 @@ export default function ThreadsPanel({
     <div style={{ display: "grid", gap: 16 }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <h3 style={{ margin: 0, color: "#c6d8f4", fontSize: 18, fontWeight: 700 }}>
-          Wątki geopolityczne
+        <h3 style={{ margin: 0, color: "#c6d8f4", fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+          Wątki
         </h3>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {threads.length > 0 && (

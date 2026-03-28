@@ -64,7 +64,18 @@ function TickerRow({ quote, ticker, onRemove }: { quote?: MarketQuote; ticker: s
         <div style={{ fontSize: 9, color: "#2a4870", letterSpacing: "0.05em" }}>{ticker}</div>
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
-        {!quote ? <span style={{ fontSize: 10, color: "#1e3555" }}>…</span> : (
+        {!quote ? (
+          <span style={{ display: "inline-flex", gap: 3 }}>
+            {[0, 1, 2].map((i) => (
+              <span key={i} style={{
+                display: "inline-block", width: 4, height: 4, borderRadius: "50%",
+                background: "#1e3a5a",
+                animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+              }} />
+            ))}
+            <style>{`@keyframes pulse{0%,80%,100%{opacity:0.2}40%{opacity:1}}`}</style>
+          </span>
+        ) : (
           <>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#eef4ff", fontVariantNumeric: "tabular-nums" }}>{fmtPrice(quote.price)}</div>
             <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>

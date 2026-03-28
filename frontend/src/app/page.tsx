@@ -234,8 +234,9 @@ export default function Page() {
     setThreadSuggestion(null);
   };
 
-  const handleSubmit = async () => {
-    if (!canGenerate) {
+  const handleSubmit = async (overrideQuery?: string) => {
+    const query = overrideQuery !== undefined ? overrideQuery : mainQuestion.trim();
+    if (!query && !hasProfile) {
       setInputValidationMessage(EMPTY_INPUT_VALIDATION_MESSAGE);
       return;
     }
@@ -252,7 +253,7 @@ export default function Page() {
       list_limit: HARD_LIST_LIMIT,
       continents: [...ALL_CONTINENTS],
       geo_focus: "",
-      query: mainQuestion.trim(),
+      query,
     };
 
     try {
@@ -570,7 +571,7 @@ export default function Page() {
       <button type="button" style={navBtnStyle("media")} onClick={() => setActiveTab("media")}
         onMouseEnter={(e) => { if (activeTab !== "media") (e.currentTarget as HTMLButtonElement).style.color = "#8ab4d8"; }}
         onMouseLeave={(e) => { if (activeTab !== "media") (e.currentTarget as HTMLButtonElement).style.color = "#4a6890"; }}>
-        Media
+        Centrum informacji
       </button>
     </aside>
   );
@@ -633,6 +634,24 @@ export default function Page() {
             <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 22 }}>
               <section className={styles.panel}>
                 <HeaderBar />
+                {/* Quick action */}
+                <div style={{ padding: "8px 18px 0" }}>
+                  <button
+                    disabled={loading}
+                    onClick={() => { setInputValidationMessage(null); void handleSubmit(""); }}
+                    style={{
+                      padding: "7px 16px", borderRadius: 7, cursor: loading ? "not-allowed" : "pointer",
+                      background: loading ? "rgba(15,28,50,0.4)" : "rgba(30,60,120,0.5)",
+                      border: "1px solid rgba(70,120,200,0.35)",
+                      color: loading ? "#1e3050" : "#90c0f0",
+                      fontSize: 11, fontWeight: 600, letterSpacing: "0.06em",
+                    }}>
+                    ⚡ Aktualna sytuacja
+                  </button>
+                  <span style={{ fontSize: 10, color: "#1e3555", marginLeft: 10 }}>
+                    Generuje brief na podstawie Twojego profilu
+                  </span>
+                </div>
                 <AnalysisPanel
                   mainQuestion={mainQuestion}
                   disabled={loading}

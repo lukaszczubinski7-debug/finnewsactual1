@@ -15,15 +15,16 @@ function formatHudDate(now: Date): string {
 }
 
 export default function HeaderBar() {
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
+    setNow(new Date());
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
-  const clock = useMemo(() => formatClock(now), [now]);
-  const hudDate = useMemo(() => formatHudDate(now), [now]);
+  const clock = now ? formatClock(now) : "";
+  const hudDate = now ? formatHudDate(now) : "";
 
   return (
     <header className={styles.header}>

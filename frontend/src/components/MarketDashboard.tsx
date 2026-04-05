@@ -127,10 +127,69 @@ export default function MarketDashboard({
   const formatTime = (d: Date) =>
     d.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-  if (loadingInstruments) {
+  const isInitialLoad = loadingInstruments || (loadingQuotes && quotes.size === 0);
+
+  if (isInitialLoad) {
     return (
-      <div style={{ padding: "32px 0", color: "#92a9cb", fontSize: 13, letterSpacing: "0.1em", textAlign: "center" }}>
-        Ładowanie instrumentów...
+      <div style={{ display: "grid", gap: 22 }}>
+        <style>{`
+          @keyframes shimmer {
+            0% { background-position: -600px 0; }
+            100% { background-position: 600px 0; }
+          }
+          .sk {
+            background: linear-gradient(90deg,
+              rgba(20,30,48,0.7) 25%,
+              rgba(40,58,90,0.5) 50%,
+              rgba(20,30,48,0.7) 75%
+            );
+            background-size: 600px 100%;
+            animation: shimmer 1.6s infinite linear;
+            border-radius: 8px;
+          }
+        `}</style>
+
+        {/* Toolbar skeleton */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div className="sk" style={{ width: 180, height: 14 }} />
+          <div className="sk" style={{ width: 100, height: 30, borderRadius: 10 }} />
+        </div>
+
+        {/* Category skeletons */}
+        {[5, 4, 3, 4].map((count, ci) => (
+          <div key={ci}>
+            <div className="sk" style={{ width: 90, height: 10, marginBottom: 12, borderRadius: 4 }} />
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+              gap: 10,
+            }}>
+              {Array.from({ length: count }).map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    border: "1px solid rgba(120,148,188,0.1)",
+                    borderRadius: 14,
+                    background: "rgba(14,20,30,0.6)",
+                    padding: "12px 14px",
+                    display: "grid",
+                    gap: 10,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <div style={{ display: "grid", gap: 5 }}>
+                      <div className="sk" style={{ width: 80, height: 12 }} />
+                      <div className="sk" style={{ width: 50, height: 8 }} />
+                    </div>
+                    <div className="sk" style={{ width: 38, height: 18, borderRadius: 6 }} />
+                  </div>
+                  <div className="sk" style={{ width: 70, height: 20 }} />
+                  <div className="sk" style={{ width: 90, height: 16, borderRadius: 6 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
@@ -250,17 +309,24 @@ export default function MarketDashboard({
                   <div
                     key={inst.ticker}
                     style={{
-                      border: "1px solid rgba(120,148,188,0.16)",
+                      border: "1px solid rgba(120,148,188,0.1)",
                       borderRadius: 14,
                       background: "rgba(14,20,30,0.6)",
                       padding: "12px 14px",
-                      minHeight: 80,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
+                      display: "grid",
+                      gap: 10,
                     }}
                   >
-                    <span style={{ color: "#3a5070", fontSize: 11 }}>{inst.ticker}</span>
+                    <style>{`@keyframes shimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}.sk2{background:linear-gradient(90deg,rgba(20,30,48,0.7) 25%,rgba(40,58,90,0.5) 50%,rgba(20,30,48,0.7) 75%);background-size:600px 100%;animation:shimmer 1.6s infinite linear;border-radius:8px}`}</style>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <div style={{ display: "grid", gap: 5 }}>
+                        <div className="sk2" style={{ width: 80, height: 12 }} />
+                        <div className="sk2" style={{ width: 50, height: 8 }} />
+                      </div>
+                      <div className="sk2" style={{ width: 38, height: 18, borderRadius: 6 }} />
+                    </div>
+                    <div className="sk2" style={{ width: 70, height: 20 }} />
+                    <div className="sk2" style={{ width: 90, height: 16, borderRadius: 6 }} />
                   </div>
                 );
               })}

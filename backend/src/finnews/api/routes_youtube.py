@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import xml.etree.ElementTree as ET
+from datetime import date as date_cls
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+import httpx
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from finnews.api.responses import utf8_json
+from finnews.clients.youtube import extract_video_id
 from finnews.db.dependencies import get_db
 from finnews.models.user import User
 from finnews.schemas.youtube import (
@@ -130,6 +134,102 @@ async def delete_channel(
     deleted = _svc.delete_channel(db, current_user.id, channel_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Kanał nie znaleziony.")
+
+
+@router.get("/channel-videos")
+async def get_channel_video_list(
+    channel_id: str = Query(..., description="YouTube channel ID (UCxxxxxxxx)"),
+    channel_name: str = Query("", description="Channel display name — improves Serper search"),
+    date_from: str = Query("", description="Filter start date ISO (2026-03-16)"),
+    date_to: str = Query("", description="Filter end date ISO (2026-03-20)"),
+    max_videos: int = Query(20, ge=1, le=30),
+) -> Any:
+    """Fetch recent videos for a channel (RSS → Serper fallback). No auth required."""
+    from finnews.settings import settings
+
+    max_v = min(max_videos, 30)
+    videos: list[dict] = []
+
+    # Parse optional date range
+    dt_from: date_cls | None = None
+    dt_to: date_cls | None = None
+    try:
+        if date_from:
+            dt_from = date_cls.fromisoformat(date_from)
+        if date_to:
+            dt_to = date_cls.fromisoformat(date_to)
+    except ValueError:
+        pass
+
+    # Try YouTube RSS feed
+    rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+    rss_ok = False
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(rss_url, headers={"User-Agent": "Mozilla/5.0"})
+        if resp.status_code == 200:
+            ns = {
+                "atom": "http://www.w3.org/2005/Atom",
+                "yt": "http://www.youtube.com/xml/schemas/2015",
+            }
+            root = ET.fromstring(resp.text)
+            for entry in root.findall("atom:entry", ns):
+                vid_id = entry.findtext("yt:videoId", default="", namespaces=ns) or ""
+                title = entry.findtext("atom:title", default="", namespaces=ns) or ""
+                published = entry.findtext("atom:published", default="", namespaces=ns) or ""
+                pub_date = published[:10] if published else ""
+
+                if pub_date and (dt_from or dt_to):
+                    try:
+                        d = date_cls.fromisoformat(pub_date)
+                        if dt_from and d < dt_from:
+                            continue
+                        if dt_to and d > dt_to:
+                            continue
+                    except ValueError:
+                        pass
+
+                videos.append({
+                    "title": title,
+                    "url": f"https://www.youtube.com/watch?v={vid_id}",
+                    "video_id": vid_id,
+                    "published": pub_date,
+                })
+                if len(videos) >= max_v:
+                    break
+            rss_ok = bool(videos)
+    except Exception as exc:
+        logger.warning("channel-videos RSS error channel_id=%s: %s", channel_id, exc)
+
+    # Serper fallback if RSS had no results
+    if not rss_ok and getattr(settings, "serper_api_key", None):
+        name_q = channel_name or channel_id
+        search_q = f"{name_q} youtube site:youtube.com/watch"
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                r = await client.post(
+                    "https://google.serper.dev/search",
+                    json={"q": search_q, "num": max_v * 2},
+                    headers={"X-API-KEY": settings.serper_api_key, "Content-Type": "application/json"},
+                )
+                r.raise_for_status()
+                data = r.json()
+            for item in (data.get("organic") or []):
+                link = item.get("link", "")
+                if "youtube.com/watch" in link or "youtu.be/" in link:
+                    vid_id = extract_video_id(link) or ""
+                    videos.append({
+                        "title": item.get("title", ""),
+                        "url": link,
+                        "video_id": vid_id,
+                        "published": item.get("date", ""),
+                    })
+                if len(videos) >= max_v:
+                    break
+        except Exception as exc:
+            logger.warning("channel-videos Serper error: %s", exc)
+
+    return utf8_json({"channel_id": channel_id, "channel_name": channel_name, "videos": videos})
 
 
 @router.post("/channels/refresh")

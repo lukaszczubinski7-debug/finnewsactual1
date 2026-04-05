@@ -16,10 +16,10 @@ ZASADY DLA mode=quick:
 ---
 
 ZASADY DLA mode=standard oraz mode=extended:
-1. Wymagane pola na gornym poziomie: headline, mode, items.
+1. Wymagane pola na gornym poziomie: headline, mode, items. Dozwolone opcjonalne: key_takeaway, verified_sources_used, sources.
 2. headline: jedno zdanie z konkretem (nazwa, liczba lub miejsce).
 3. Liczba items: standard = 3-4 bloki, extended = 4-5 blokow. Nie przekraczac 5.
-4. Kazdy item musi miec pola title i body (oba niepuste).
+4. Kazdy item musi miec pola title i body (oba niepuste). Dozwolone opcjonalne pola w item: source_tag, source_name.
 5. title: konkretna nazwa zdarzenia (co sie stalo), nie ogolna ocena.
 6. body: 2-3 zdania. Kazde zdanie musi zawierac minimum 2 konkrety sposrod: nazwa wlasna, liczba, data, miejsce.
 7. ZABRONIONE slowa w body: "moze", "moga", "mogl", "prawdopodobnie", "grozic", "oczekuje sie", "analitycy", "inwestorzy obawiaja sie", "wzrosnie presja", "to moze oznaczac", "implikacje", "wplyw na rynki", "rynki moga reagowac", "budzi obawy", "pozostaje napieta", "moze spowodowac".

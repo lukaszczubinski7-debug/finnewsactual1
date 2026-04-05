@@ -22,6 +22,7 @@ class UserPreference(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     market_tickers: Mapped[str | None] = mapped_column(Text, nullable=True)
     sources_trust_level: Mapped[float | None] = mapped_column(Float, nullable=True, default=0.5)
+    custom_sources: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

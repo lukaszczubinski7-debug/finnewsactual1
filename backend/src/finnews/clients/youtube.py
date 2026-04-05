@@ -127,18 +127,20 @@ def get_transcript(video_id: str, preferred_langs: list[str] | None = None) -> t
     Raises ValueError if no transcript available.
     """
     langs = preferred_langs or ["pl", "en", "de", "fr", "es"]
+    api = YouTubeTranscriptApi()
     try:
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-        # Try preferred languages first (manual captions)
-        try:
-            t = transcript_list.find_transcript(langs)
-        except NoTranscriptFound:
-            # Fallback: any available transcript, translated to first preferred lang
-            t = transcript_list.find_generated_transcript(langs)
-
-        data = t.fetch()
-        text = " ".join(item["text"] for item in data).strip()
-        return text, t.language_code
+        # Nowe API (>= 0.7): api.fetch(video_id, languages=[...])
+        fetched = api.fetch(video_id, languages=langs)
+        text = " ".join(
+            snippet.text for snippet in fetched
+        ).strip()
+        lang_code = fetched.video_id if hasattr(fetched, "video_id") else langs[0]
+        # Wyciągnij język z obiektu jeśli dostępny
+        if hasattr(fetched, "language"):
+            lang_code = fetched.language
+        elif hasattr(fetched, "language_code"):
+            lang_code = fetched.language_code
+        return text, lang_code
     except TranscriptsDisabled:
         raise ValueError("Napisy są wyłączone dla tego filmu.")
     except NoTranscriptFound:

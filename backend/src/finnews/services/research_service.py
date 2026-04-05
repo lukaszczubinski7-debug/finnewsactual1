@@ -7,6 +7,10 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
+import xml.etree.ElementTree as ET
+
+import httpx
+
 from finnews.clients.scraper import scrape_article
 from finnews.clients.serper import SerperClient
 from finnews.clients.twitter import TwitterClient, _MAX_CALLS_PER_SESSION
@@ -69,8 +73,9 @@ _BASE_TOOLS: list[dict[str, Any]] = [
         "function": {
             "name": "get_youtube_transcript",
             "description": (
-                "Pobierz transkrypcję z filmu YouTube. "
-                "Użyj gdy pytanie dotyczy konkretnego wideo YouTube lub gdy chcesz przeanalizować jego treść."
+                "Pobierz transkrypcję z filmu YouTube podając jego URL. "
+                "Użyj gdy pytanie dotyczy konkretnego wideo lub po wywołaniu get_channel_videos — "
+                "zawsze pobierz transkrypcję najnowszego filmu z listy."
             ),
             "parameters": {
                 "type": "object",
@@ -81,6 +86,37 @@ _BASE_TOOLS: list[dict[str, Any]] = [
                     }
                 },
                 "required": ["video_url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_channel_videos",
+            "description": (
+                "Pobierz listę ostatnich filmów z kanału YouTube. "
+                "Zwraca tytuły, URL i daty publikacji. "
+                "ZAWSZE po wywołaniu tego narzędzia użyj get_youtube_transcript na 1-2 NAJNOWSZYCH filmach z listy — "
+                "niezależnie od daty publikacji. Jeśli użytkownik prosi o 'ostatni tydzień' a filmy są sprzed 2-3 tygodni, "
+                "i tak pobierz transkrypcję najnowszych dostępnych i poinformuj o ich dacie."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "channel_id": {
+                        "type": "string",
+                        "description": "ID kanału YouTube (np. UCTTzMDoVCbaX6K1CwKsRJsQ) lub pełny URL kanału.",
+                    },
+                    "channel_name": {
+                        "type": "string",
+                        "description": "Nazwa kanału (np. 'Good Times Bad Times PL') — pomaga w wyszukiwaniu.",
+                    },
+                    "max_videos": {
+                        "type": "integer",
+                        "description": "Maksymalna liczba filmów do zwrócenia (domyślnie 5, max 10).",
+                    },
+                },
+                "required": ["channel_id"],
             },
         },
     },
@@ -152,12 +188,21 @@ def _build_tools(twitter_available: bool) -> list[dict[str, Any]]:
     return [t for t in _BASE_TOOLS if t["function"]["name"] != "search_twitter"]
 
 
-def _build_system_prompt(trust_level: float) -> str:
-    """Buduje system prompt z opcjonalną sekcją zweryfikowanych źródeł."""
-    sources_context = get_sources_context_for_prompt(trust_level)
+def _build_system_prompt(
+    trust_level: float,
+    source_weights: dict[str, float] | None = None,
+    custom_x_handles: list[dict] | None = None,
+) -> str:
+    """Buduje system prompt z aktualną datą i opcjonalną sekcją zweryfikowanych źródeł."""
+    from datetime import UTC, datetime
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    date_line = f"Dzisiaj jest {today} (UTC). Traktuj daty z narzędzi jako wiarygodne — dane mogą być nowsze niż Twoja wiedza treningowa."
+
+    sources_context = get_sources_context_for_prompt(trust_level, source_weights, custom_x_handles)
+    parts = [_BASE_SYSTEM_PROMPT, date_line]
     if sources_context:
-        return _BASE_SYSTEM_PROMPT + "\n\n" + sources_context
-    return _BASE_SYSTEM_PROMPT
+        parts.append(sources_context)
+    return "\n\n".join(parts)
 
 
 class ResearchService:
@@ -172,7 +217,9 @@ class ResearchService:
         name: str,
         args: dict[str, Any],
         trust_level: float,
-        twitter_calls: list[int],  # mutable counter
+        twitter_calls: list[int],
+        source_weights: dict[str, float] | None = None,
+        custom_x_handles: list[dict] | None = None,
     ) -> str:
         try:
             if name == "search_web":
@@ -201,6 +248,81 @@ class ResearchService:
                 except ValueError as e:
                     return json.dumps({"error": str(e)})
 
+            elif name == "get_channel_videos":
+                raw = args["channel_id"].strip()
+                channel_name = args.get("channel_name", "").strip()
+                max_videos = min(int(args.get("max_videos", 5)), 10)
+
+                # Wyciągnij channel_id z URL jeśli podano pełny URL
+                if "youtube.com/channel/" in raw:
+                    channel_id = raw.split("youtube.com/channel/")[-1].split("/")[0].split("?")[0]
+                elif "youtube.com/@" in raw:
+                    channel_id = raw.split("youtube.com/@")[-1].split("/")[0].split("?")[0]
+                else:
+                    channel_id = raw
+
+                # Spróbuj RSS (szybkie, bez API)
+                videos: list[dict] = []
+                rss_ok = False
+                rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+                try:
+                    async with httpx.AsyncClient(timeout=8.0) as client:
+                        resp = await client.get(rss_url, headers={"User-Agent": "Mozilla/5.0"})
+                    if resp.status_code == 200:
+                        ns = {
+                            "atom": "http://www.w3.org/2005/Atom",
+                            "yt": "http://www.youtube.com/xml/schemas/2015",
+                        }
+                        root = ET.fromstring(resp.text)
+                        channel_title = root.findtext("atom:title", default=channel_name, namespaces=ns)
+                        for entry in root.findall("atom:entry", ns)[:max_videos]:
+                            vid_id = entry.findtext("yt:videoId", default="", namespaces=ns)
+                            title = entry.findtext("atom:title", default="", namespaces=ns)
+                            published = entry.findtext("atom:published", default="", namespaces=ns)
+                            videos.append({
+                                "title": title,
+                                "url": f"https://www.youtube.com/watch?v={vid_id}",
+                                "published": published[:10] if published else "",
+                            })
+                        rss_ok = bool(videos)
+                except Exception:
+                    pass
+
+                # Fallback: Serper organic search — szuka filmów po nazwie kanału
+                # Bez cudzysłowów + słowo "youtube" → lepsze wyniki i aktualne daty
+                if not rss_ok and self.serper.enabled:
+                    name_q = channel_name or channel_id
+                    search_q = f'{name_q} youtube site:youtube.com/watch'
+                    try:
+                        async with httpx.AsyncClient(timeout=8.0) as client:
+                            r = await client.post(
+                                "https://google.serper.dev/search",
+                                json={"q": search_q, "num": max_videos * 2},
+                                headers={"X-API-KEY": settings.serper_api_key, "Content-Type": "application/json"},
+                            )
+                            r.raise_for_status()
+                            data = r.json()
+                        for item in (data.get("organic") or []):
+                            link = item.get("link", "")
+                            if "youtube.com/watch" in link or "youtu.be/" in link:
+                                videos.append({
+                                    "title": item.get("title", ""),
+                                    "url": link,
+                                    "published": item.get("date", ""),
+                                })
+                            if len(videos) >= max_videos:
+                                break
+                    except Exception as e:
+                        logger.warning("get_channel_videos serper fallback error: %s", e)
+
+                if not videos:
+                    return json.dumps({"error": f"Nie znaleziono filmów dla kanału {channel_id}. Spróbuj podać channel_name."})
+
+                return json.dumps({
+                    "channel": channel_name or channel_id,
+                    "videos": videos,
+                }, ensure_ascii=False)
+
             elif name == "fetch_webpage":
                 text = await scrape_article(args["url"])
                 return json.dumps({"content": text[:5000] if text else ""})
@@ -217,9 +339,13 @@ class ResearchService:
 
                 twitter_calls[0] += 1
 
-                # Zastosuj trust level — filtruj lub nie
+                # Zastosuj trust level + aktywne źródła
                 raw_query = args["query"]
-                query = apply_trust_to_query(raw_query, trust_level)
+                query = apply_trust_to_query(
+                    raw_query, trust_level,
+                    source_weights=source_weights,
+                    custom_x_handles=custom_x_handles,
+                )
                 query_type = args.get("query_type", "Latest")
 
                 tweets = await self.twitter.search(query, query_type=query_type)
@@ -236,14 +362,26 @@ class ResearchService:
             logger.warning("research tool %s error: %s", name, e)
             return json.dumps({"error": str(e)})
 
-    async def run(self, query: str, sources_trust_level: float = 0.5) -> dict[str, Any]:
+    async def run(
+        self,
+        query: str,
+        sources_trust_level: float = 0.5,
+        source_weights: dict[str, float] | None = None,
+        custom_x_handles: list[dict] | None = None,
+    ) -> dict[str, Any]:
         """
         Run a research query using LLM tool calling.
         Returns {"report": str, "tools_used": list[str], "sources": list[dict]}.
 
-        sources_trust_level (0.0-1.0): kontroluje jak mocno LLM preferuje zweryfikowane źródła.
+        sources_trust_level (0.0-1.0): ogólny tryb preferencji źródeł.
+        source_weights: dict[handle, 0.0-1.0] — indywidualna waga każdego źródła.
+        custom_x_handles: lista [{handle, name, weight?}] własnych kont X.
         """
-        system_prompt = _build_system_prompt(sources_trust_level)
+        system_prompt = _build_system_prompt(
+            sources_trust_level,
+            source_weights=source_weights,
+            custom_x_handles=custom_x_handles,
+        )
         tools = _build_tools(self.twitter.available)
 
         messages: list[dict[str, Any]] = [
@@ -253,104 +391,129 @@ class ResearchService:
 
         tools_used: list[str] = []
         sources: list[dict[str, str]] = []
-        twitter_calls: list[int] = [0]  # mutable counter shared with _execute_tool
+        twitter_calls: list[int] = [0]
+        _weights = source_weights or {}
+        _custom_x = custom_x_handles or []
 
-        # First call — LLM picks tools
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,  # type: ignore[arg-type]
-            tools=tools,  # type: ignore[arg-type]
-            tool_choice="auto",
-            temperature=0.3,
-        )
+        _MAX_ROUNDS = 6  # max rund tool-calling (każda runda = jeden LLM call)
 
-        msg = response.choices[0].message
+        for _round in range(_MAX_ROUNDS):
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,  # type: ignore[arg-type]
+                tools=tools,  # type: ignore[arg-type]
+                tool_choice="auto",
+                temperature=0.3,
+            )
 
-        # No tool calls — return direct answer
-        if not msg.tool_calls:
-            return {
-                "report": msg.content or "",
-                "tools_used": [],
-                "sources": [],
-            }
+            msg = response.choices[0].message
 
-        # Build assistant message dict for re-submission
-        tool_call_dicts = []
-        for tc in msg.tool_calls:
-            tool_call_dicts.append({
-                "id": tc.id,
-                "type": "function",
-                "function": {"name": tc.function.name, "arguments": tc.function.arguments},
-            })
+            # LLM nie wywołał narzędzi — gotowa odpowiedź
+            if not msg.tool_calls:
+                return {
+                    "report": (msg.content or "").strip(),
+                    "tools_used": list(set(tools_used)),
+                    "sources": sources,
+                }
 
-        messages.append({
-            "role": "assistant",
-            "content": msg.content,
-            "tool_calls": tool_call_dicts,
-        })
-
-        # Collect tool tasks
-        tool_tasks: list[tuple[str, str, dict[str, Any]]] = []
-        for tc in msg.tool_calls:
-            tools_used.append(tc.function.name)
-            try:
-                args = json.loads(tc.function.arguments)
-            except json.JSONDecodeError:
-                args = {}
-            tool_tasks.append((tc.id, tc.function.name, args))
-
-        # Execute tools in parallel
-        results = await asyncio.gather(*[
-            self._execute_tool(name, args, sources_trust_level, twitter_calls)
-            for _, name, args in tool_tasks
-        ])
-
-        # Append tool results and collect sources
-        for (tool_call_id, name, _args), result_str in zip(tool_tasks, results):
+            # Dodaj odpowiedź asystenta do historii
+            tool_call_dicts = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                }
+                for tc in msg.tool_calls
+            ]
             messages.append({
-                "role": "tool",
-                "tool_call_id": tool_call_id,
-                "content": result_str,
+                "role": "assistant",
+                "content": msg.content,
+                "tool_calls": tool_call_dicts,
             })
 
-            if name == "search_web":
+            # Zbierz i wykonaj narzędzia równolegle
+            tool_tasks: list[tuple[str, str, dict[str, Any]]] = []
+            for tc in msg.tool_calls:
+                tools_used.append(tc.function.name)
                 try:
-                    items = json.loads(result_str)
-                    if isinstance(items, list):
-                        for item in items[:6]:
-                            if item.get("link") and item.get("title"):
+                    args = json.loads(tc.function.arguments)
+                except json.JSONDecodeError:
+                    args = {}
+                tool_tasks.append((tc.id, tc.function.name, args))
+
+            results = await asyncio.gather(*[
+                self._execute_tool(name, args, sources_trust_level, twitter_calls, _weights, _custom_x)
+                for _, name, args in tool_tasks
+            ])
+
+            # Dodaj wyniki narzędzi do historii i zbierz źródła
+            for (tool_call_id, name, _args), result_str in zip(tool_tasks, results):
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": result_str,
+                })
+
+                if name == "search_web":
+                    try:
+                        items = json.loads(result_str)
+                        if isinstance(items, list):
+                            for item in items[:6]:
+                                if item.get("link") and item.get("title"):
+                                    sources.append({
+                                        "title": item["title"],
+                                        "url": item["link"],
+                                        "provider": item.get("source", ""),
+                                    })
+                    except Exception:
+                        pass
+
+                elif name == "search_twitter":
+                    try:
+                        data = json.loads(result_str)
+                        for tweet in data.get("tweets", [])[:5]:
+                            if tweet.get("url"):
                                 sources.append({
-                                    "title": item["title"],
-                                    "url": item["link"],
-                                    "provider": item.get("source", ""),
+                                    "title": f"@{tweet.get('author_handle', '?')}: {tweet.get('text', '')[:80]}...",
+                                    "url": tweet["url"],
+                                    "provider": "X (Twitter)",
                                 })
-                except Exception:
-                    pass
+                    except Exception:
+                        pass
 
-            elif name == "search_twitter":
-                try:
-                    data = json.loads(result_str)
-                    for tweet in data.get("tweets", [])[:5]:
-                        if tweet.get("url"):
+                elif name == "get_youtube_transcript":
+                    try:
+                        data = json.loads(result_str)
+                        if data.get("transcript") and _args.get("video_url"):
                             sources.append({
-                                "title": f"@{tweet.get('author_handle', '?')}: {tweet.get('text', '')[:80]}...",
-                                "url": tweet["url"],
-                                "provider": "X (Twitter)",
+                                "title": f"Transkrypcja YT ({data.get('language', '')})",
+                                "url": _args["video_url"],
+                                "provider": "YouTube",
                             })
-                except Exception:
-                    pass
+                    except Exception:
+                        pass
 
-        # Final synthesis call
+                elif name == "get_channel_videos":
+                    try:
+                        data = json.loads(result_str)
+                        for v in data.get("videos", [])[:3]:
+                            if v.get("url"):
+                                sources.append({
+                                    "title": v.get("title", "Film YT"),
+                                    "url": v["url"],
+                                    "provider": data.get("channel", "YouTube"),
+                                })
+                    except Exception:
+                        pass
+
+        # Jeśli osiągnięto limit rund — wymuś syntezę bez narzędzi
         final = await self.client.chat.completions.create(
             model=self.model,
             messages=messages,  # type: ignore[arg-type]
             temperature=0.3,
         )
-
-        report = (final.choices[0].message.content or "").strip()
-
         return {
-            "report": report,
+            "report": (final.choices[0].message.content or "").strip(),
             "tools_used": list(set(tools_used)),
             "sources": sources,
         }

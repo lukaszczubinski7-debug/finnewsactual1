@@ -6,7 +6,8 @@ export type BriefContext =
   | "Surowce / energia"
   | "Crypto"
   | "Polska / GPW"
-  | "Technologia";
+  | "Technologia"
+  | "Wydarzenia korporacyjne";
 
 export type ContinentCode = "NA" | "EU" | "AS" | "ME" | "SA" | "AF" | "OC";
 
@@ -88,7 +89,38 @@ export type QuickSummary = {
   summary: string;
 };
 
-export type BriefSummary = QuickSummary | ShortSummary | MidSummary | LongSummary;
+export type BriefItem = {
+  title: string;
+  body: string;
+  source_tag?: "verified" | "official" | "media";
+  source_name?: string;
+};
+
+export type StructuredSummary = {
+  headline: string;
+  key_takeaway?: string;
+  mode: "standard" | "extended";
+  items: BriefItem[];
+  verified_sources_used?: string[];
+  sources?: Array<{
+    title: string;
+    url: string;
+    publisher: string;
+    published_at: string;
+  }>;
+};
+
+export type BriefSummary = QuickSummary | ShortSummary | MidSummary | LongSummary | StructuredSummary;
+
+export type PreGeneratedBriefEntry = {
+  context: string;
+  brief: BriefResponse;
+  generated_at: string | null;
+};
+
+export type PreGeneratedBriefsResponse = {
+  briefs: PreGeneratedBriefEntry[];
+};
 
 export type BriefSource = {
   id: string;
@@ -204,6 +236,18 @@ export type LoginResponse = {
   user: AuthUser;
 };
 
+export type CustomXSource = {
+  handle: string;
+  name: string;
+  weight: number;    // 0.0–1.0
+  description?: string;
+};
+
+export type SourcesConfig = {
+  source_weights: Record<string, number>;   // handle → 0.0–1.0
+  custom_x: CustomXSource[];
+};
+
 export type UserPreference = {
   search_profile_text: string | null;
   response_style: string | null;
@@ -213,6 +257,7 @@ export type UserPreference = {
   notes: string | null;
   market_tickers?: string[] | null;
   sources_trust_level?: number;
+  custom_sources?: SourcesConfig | null;
 };
 
 export type UserPreferenceUpdate = {
@@ -224,6 +269,24 @@ export type UserPreferenceUpdate = {
   notes?: string | null;
   market_tickers?: string[] | null;
   sources_trust_level?: number | null;
+  custom_sources?: SourcesConfig | null;
+};
+
+export type EarningsEvent = {
+  id: number;
+  ticker: string;
+  company_name: string;
+  market: "WSE" | "US";
+  report_date: string;
+  report_type: string | null;
+  fiscal_period: string | null;
+  source: string;
+  indices: string[];
+};
+
+export type EarningsDay = {
+  date: string;
+  events: EarningsEvent[];
 };
 
 export type MarketQuote = {
@@ -282,6 +345,13 @@ export type YoutubeSource = {
   created_at: string;
   processed_at: string | null;
   channel_db_id: number | null;
+};
+
+export type VideoItem = {
+  title: string;
+  url: string;
+  video_id: string;
+  published: string;
 };
 
 export type YoutubeChannel = {

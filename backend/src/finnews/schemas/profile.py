@@ -12,6 +12,7 @@ class UserPreferenceResponse(BaseModel):
     notes: str | None = None
     market_tickers: list[str] | None = None
     sources_trust_level: float = Field(default=0.5, ge=0.0, le=1.0)
+    custom_sources: dict | None = None
 
 
 class UserPreferenceUpdateRequest(BaseModel):
@@ -23,3 +24,4 @@ class UserPreferenceUpdateRequest(BaseModel):
     notes: str | None = None
     market_tickers: list[str] | None = None
     sources_trust_level: float | None = Field(default=None, ge=0.0, le=1.0)
+    custom_sources: dict | None = None

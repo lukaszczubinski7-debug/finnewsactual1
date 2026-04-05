@@ -46,6 +46,24 @@ def health():
     return utf8_json({"status": "ok"})
 
 
+@router.get("/pregenerated-briefs")
+def get_pregenerated_briefs(db: Session = Depends(get_db)):
+    """Serve pre-generated briefs to all users (no auth required)."""
+    from finnews.models.pregenerated_brief import PreGeneratedBrief
+
+    briefs = db.query(PreGeneratedBrief).filter(PreGeneratedBrief.status == "ready").all()
+    return utf8_json({
+        "briefs": [
+            {
+                "context": b.context,
+                "brief": b.response_payload,
+                "generated_at": b.generated_at.isoformat() if b.generated_at else None,
+            }
+            for b in briefs
+        ]
+    })
+
+
 @router.get("/axesso/ping")
 async def axesso_ping():
     try:
@@ -205,10 +223,26 @@ async def brief(
 ):
     request_id = str(uuid4())
     preference_context = ""
+    sources_trust_level = 0.0
+    source_weights: dict[str, float] | None = None
+    custom_x_handles: list[dict[str, Any]] | None = None
     if current_user is not None:
         enforce_brief_limit(db, current_user.id)
         preference = db.query(UserPreference).filter(UserPreference.user_id == current_user.id).first()
         preference_context = profile_svc.build_preference_context(preference)
+        if preference is not None:
+            sources_trust_level = float(preference.sources_trust_level or 0.0)
+            custom_sources = preference.custom_sources if isinstance(preference.custom_sources, dict) else {}
+            raw_weights = custom_sources.get("source_weights")
+            if isinstance(raw_weights, dict):
+                source_weights = {
+                    str(key): float(value)
+                    for key, value in raw_weights.items()
+                    if isinstance(key, str)
+                }
+            raw_custom_x = custom_sources.get("custom_x")
+            if isinstance(raw_custom_x, list):
+                custom_x_handles = [item for item in raw_custom_x if isinstance(item, dict)]
     try:
         result = await svc.run(
             continents=req.continents,
@@ -224,6 +258,9 @@ async def brief(
             debug=req.debug,
             window_hours=req.window_hours,
             preference_context=preference_context or None,
+            sources_trust_level=sources_trust_level,
+            source_weights=source_weights,
+            custom_x_handles=custom_x_handles,
             request_id=request_id,
         )
         response = BriefResponse(

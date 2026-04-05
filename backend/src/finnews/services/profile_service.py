@@ -43,6 +43,10 @@ class ProfileService:
         if "market_tickers" in updates:
             tickers = updates["market_tickers"]
             preference.market_tickers = ",".join(_as_string_list(tickers)) if tickers else None
+        if "sources_trust_level" in updates and updates["sources_trust_level"] is not None:
+            preference.sources_trust_level = float(updates["sources_trust_level"])
+        if "custom_sources" in updates:
+            preference.custom_sources = updates["custom_sources"]
 
         db.add(preference)
         db.commit()

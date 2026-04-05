@@ -56,4 +56,4 @@ STRUKTURA JSON (zwroc wylacznie JSON, bez markdown):
   "confidence_level": "high|medium|low"
 }
 
-Liczba elementow: timeline 3-8, scenarios 2-4, assets 2-6, latest_developments 2-5.
+Liczba elementow: timeline 3-8, scenarios 2-4, assets 2-6, latest_developments 5-12 (staraj sie pokryc rozne okresy: najnowsze 24h, 24-72h, ostatni tydzien — im rozleglejsze pokrycie czasowe, tym lepiej dla analizy trendow).

@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { ResearchResponse } from "../lib/types";
+import { SourceBubbles } from "./SourceBubbles";
 
 // ── Tool label map ─────────────────────────────────────────────────────────
 
@@ -156,25 +157,6 @@ export default function ResearchPanel({
             {loading ? "Analizuję..." : "▶ Generuj raport"}
           </button>
 
-          <button
-            onClick={() => {
-              onQueryChange("");
-              onSubmit("");
-            }}
-            disabled={loading}
-            title="Generuj brief na podstawie Twojego profilu"
-            style={{
-              padding: "8px 14px", borderRadius: 7,
-              background: loading ? "rgba(15,28,50,0.4)" : "rgba(30,60,120,0.5)",
-              border: "1px solid rgba(70,120,200,0.35)",
-              color: loading ? "#1e3050" : "#90c0f0",
-              cursor: loading ? "not-allowed" : "pointer",
-              fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
-            }}
-          >
-            ⚡ Aktualna sytuacja
-          </button>
-
           {(result || error) && !loading && (
             <button
               onClick={onClear}
@@ -265,30 +247,15 @@ export default function ResearchPanel({
             <div style={{
               padding: "10px 14px",
               borderTop: "1px solid rgba(100,140,200,0.07)",
+              display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
             }}>
-              <div style={{ fontSize: 9, color: "#1e3555", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
+              <span style={{ fontSize: 9, color: "#1e3555", letterSpacing: "0.1em", textTransform: "uppercase", flexShrink: 0 }}>
                 Źródła
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {result.sources.map((s, i) => (
-                  <div key={i} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
-                    <span style={{ fontSize: 9, color: "#1e3555", flexShrink: 0 }}>{i + 1}.</span>
-                    <a
-                      href={s.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ fontSize: 11, color: "#3a6090", textDecoration: "none" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = "#6090c0")}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = "#3a6090")}
-                    >
-                      {s.title}
-                    </a>
-                    {s.provider && (
-                      <span style={{ fontSize: 9, color: "#1e3555" }}>— {s.provider}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
+              </span>
+              <SourceBubbles
+                sources={result.sources.map((s) => ({ title: s.title, url: s.url, provider: s.provider }))}
+                maxVisible={12}
+              />
             </div>
           )}
         </div>

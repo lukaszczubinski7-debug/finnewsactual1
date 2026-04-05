@@ -76,11 +76,18 @@ finnewsactual1/
 
 ### Zakładki frontendowe
 
-- **Centrum informacji** (ActiveTab: "centrum"):
-  - Sub-zakładka "🔍 Research": ResearchPanel — textarea + wyniki z tool calling
-  - Sub-zakładka "📺 Media": YoutubePanel — filmy i kanały YouTube
-  - ThreadsPanel na prawej kolumnie (dla zalogowanych)
-- **Dashboard** (ActiveTab: "dashboard"): wieloplanszowy dashboard rynkowy z grupami tickerów
+`ActiveTab = "centrum" | "dashboard"` — usunięto oddzielną zakładkę "zrodla"
+
+- **Centrum informacji** (ActiveTab: "centrum") — CentrumSubTab: "briefy" | "zrodla":
+  - Sub-zakładka **Briefy**:
+    - StructuredBriefsPanel — 3 briefy strukturyzowane (Geopolityka / Makro / Tech)
+    - ResearchPanel — textarea + wyniki z tool calling (bez przycisku "Aktualna sytuacja")
+    - ThreadsPanel na prawej kolumnie (dla zalogowanych)
+  - Sub-zakładka **Zweryfikowane Źródła** (SourcesSettingsPanel):
+    - Suwak zaufania (trust level 0–1)
+    - 19 kont X + 5 kanałów YT + 15 instytucji (PL/EU/US) pogrupowanych
+- **Dashboard** (ActiveTab: "dashboard"): dashboard rynkowy z 8 kategoriami:
+  - Indeksy (14), Obligacje (4), Surowce (11), Waluty (8), Krypto (9), ETF (12), Akcje GPW (15), Akcje US (15)
 
 ---
 
@@ -202,14 +209,16 @@ Dodatkowe notatki i kontekst projektu są w dwóch miejscach:
 
 ## Instrumenty rynkowe (dashboard)
 
-48 instrumentów domyślnych w 6 kategoriach:
+93 instrumentów w 8 kategoriach (25 defaultowych):
 
-- **Indeksy:** ^GSPC, ^IXIC, ^DJI, ^GDAXI, WIG20.WA, ^FTSE, ^N225, ^HSI, ^STOXX50E, ^CAC40, ^SP500TR, ^RUT
-- **Obligacje:** ^TNX, ^TYX, ^FVX, ^IRX
-- **Surowce:** GC=F, SI=F, CL=F, BZ=F, NG=F, HG=F, ZC=F, ZW=F
-- **Waluty:** EURUSD=X, GBPUSD=X, USDJPY=X, USDPLN=X, EURPLN=X, USDCHF=X, AUDUSD=X, USDCNH=X
-- **Krypto:** BTC-USD, ETH-USD, SOL-USD, BNB-USD, XRP-USD, DOGE-USD
-- **ETF:** SPY, QQQ, IWM, GLD, TLT, EEM, VNQ, HYG
+- **Indeksy (14):** ^GSPC*, ^IXIC*, ^DJI*, ^GDAXI*, WIG20.WA*, ^FTSE, ^N225, ^HSI, ^STOXX50E, ^CAC40, ^RUT, ^VIX, ^BVSP, ^NSEI
+- **Obligacje (4):** ^TNX*, ^TYX*, ^FVX, ^IRX
+- **Surowce (11):** GC=F*, CL=F*, SI=F, BZ=F, NG=F, HG=F, PA=F, PL=F, ZC=F, ZW=F, ZS=F
+- **Waluty (8):** EURUSD=X*, USDJPY=X*, USDPLN=X*, EURPLN=X*, GBPUSD=X, USDCHF=X, AUDUSD=X, USDCNH=X
+- **Krypto (9):** BTC-USD*, ETH-USD*, SOL-USD, BNB-USD, XRP-USD, DOGE-USD, ADA-USD, AVAX-USD, DOT-USD
+- **ETF (12):** SPY, QQQ, IWM, GLD, TLT, EEM, VNQ, HYG, AGG, VTI, ARKK, GDXJ
+- **Akcje GPW (15):** PKN.WA*, CDR.WA*, PKO.WA*, PZU.WA*, KGHM.WA*, LPP.WA, ALE.WA, MBK.WA, DNP.WA, PEO.WA, OPL.WA, JSW.WA, PGE.WA, XTB.WA, CPS.WA
+- **Akcje US (15):** AAPL*, MSFT*, NVDA*, GOOGL*, TSLA*, AMZN, META, NFLX, JPM, V, BRK-B, COIN, PLTR, ORCL, AMD
 
-Źródło: yfinance (gratis, ~15 min opóźnienie dla giełd). Cache TTL 60s.
+(*) = default. Źródło: yfinance. Cache TTL 60s. Akcje .WA — dane GPW w PLN.
 Użytkownik może spersonalizować listę — zapisuje się w `user_preferences.market_tickers`.

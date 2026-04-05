@@ -25,6 +25,8 @@ def _to_response(preference) -> UserPreferenceResponse:
         interested_topics=preference.interested_topics or [],
         notes=preference.notes,
         market_tickers=market_tickers,
+        sources_trust_level=preference.sources_trust_level or 0.5,
+        custom_sources=preference.custom_sources,
     )
 
 

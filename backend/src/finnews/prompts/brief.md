@@ -16,9 +16,13 @@ Pominij news jezeli nie zawiera konkretow (liczb, nazw wlasnych, dat, miejsc).
 
 STRUKTURA:
 - headline: jedno zdanie z konkretem (nazwa, liczba, miejsce) o najwazniejszym wydarzeniu dnia
+- key_takeaway: 1 zdanie — najwazniejszy wniosek/fakt dla inwestora (co to oznacza w liczbach)
 - items: 3-4 bloki tematyczne, posortowane od najwazniejszego do najmniej waznego
   - title: konkretna nazwa zdarzenia (co sie stalo, nie ocena)
   - body: 2-3 zdania faktow; kazde zdanie musi zawierac minimum 2 konkrety (nazwa wlasna, liczba, data, miejsce)
+  - source_tag: "verified" jesli glowna informacja pochodzi z verified_sources, "official" jesli z agencji/komunikatow, "media" jesli z ogolnych mediow
+  - source_name: nazwa konkretnego zrodla (np. "Mariusz Hojda (@k0g00t)", "Reuters", "Bloomberg")
+- verified_sources_used: lista nazw zweryfikowanych zrodel ktore faktycznie zostaly wykorzystane w briefie (pusta jesli brak)
 
 ZASADY NIEZMIENNE:
 1. TYLKO FAKTY z podanych sources. Nie interpretuj, nie spekuluj, nie oceniaj.

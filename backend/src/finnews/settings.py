@@ -55,5 +55,12 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = Field(default=False, alias="SCHEDULER_ENABLED")
     scheduler_refresh_cron: str = Field(default="0 6 * * *", alias="SCHEDULER_REFRESH_CRON")
 
+    # Earnings calendar
+    earnings_refresh_cron: str = Field(default="0 7 * * *", alias="EARNINGS_REFRESH_CRON")
+    earnings_scrape_timeout_s: float = Field(default=15.0, alias="EARNINGS_SCRAPE_TIMEOUT_S")
+
+    # Pre-generated briefs
+    pregen_briefs_cron: str = Field(default="15 */4 * * *", alias="PREGEN_BRIEFS_CRON")
+
 
 settings = Settings()

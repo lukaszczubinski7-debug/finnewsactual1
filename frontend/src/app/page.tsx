@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 
 import AuthProfilePanel from "../components/AuthProfilePanel";
+import BriefResult from "../components/BriefResult";
 import Dashboard from "../components/Dashboard";
+import EarningsCalendar from "../components/EarningsCalendar";
 import HeaderBar from "../components/HeaderBar";
 import ResearchPanel from "../components/ResearchPanel";
 import SourcesSettingsPanel from "../components/SourcesSettingsPanel";
@@ -24,12 +26,15 @@ import type {
 
 const AUTH_TOKEN_KEY = "finnews_access_token";
 const TRUST_LEVEL_KEY = "finnews_trust_level";
+const SOURCE_WEIGHTS_KEY = "finnews_source_weights";
 type AuthMode = "closed" | "login" | "register" | "profile";
-type ActiveTab = "centrum" | "dashboard" | "zrodla";
+type ActiveTab = "centrum" | "dashboard" | "kalendarz";
+type CentrumSubTab = "briefy" | "zrodla";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Page() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("centrum");
+  const [centrumSubTab, setCentrumSubTab] = useState<CentrumSubTab>("briefy");
   const [isMobile, setIsMobile] = useState(false);
 
   // Auth
@@ -185,7 +190,24 @@ export default function Page() {
     if (!token) return;
     setTrustSaving(true);
     try {
-      await patchPreferences(token, { sources_trust_level: trustLevel });
+      let sourceWeights: Record<string, number> = {};
+      try {
+        const raw = window.localStorage.getItem(SOURCE_WEIGHTS_KEY);
+        if (raw) {
+          sourceWeights = JSON.parse(raw) as Record<string, number>;
+        }
+      } catch {
+        sourceWeights = {};
+      }
+
+      const saved = await patchPreferences(token, {
+        sources_trust_level: trustLevel,
+        custom_sources: {
+          source_weights: sourceWeights,
+          custom_x: preferences?.custom_sources?.custom_x ?? [],
+        },
+      });
+      setPreferences(saved);
     } catch { /* silent */ } finally {
       setTrustSaving(false);
     }
@@ -404,26 +426,14 @@ export default function Page() {
         onMouseLeave={(e) => { if (activeTab !== "dashboard") (e.currentTarget as HTMLButtonElement).style.color = "#4a6890"; }}>
         Dashboard
       </button>
-      <button type="button" style={navBtnStyle("zrodla")} onClick={() => setActiveTab("zrodla")}
-        onMouseEnter={(e) => { if (activeTab !== "zrodla") (e.currentTarget as HTMLButtonElement).style.color = "#8ab4d8"; }}
-        onMouseLeave={(e) => { if (activeTab !== "zrodla") (e.currentTarget as HTMLButtonElement).style.color = "#4a6890"; }}>
-        Źródła
+      <button type="button" style={{ ...navBtnStyle("kalendarz"), position: "relative" }} onClick={() => setActiveTab("kalendarz")}
+        onMouseEnter={(e) => { if (activeTab !== "kalendarz") (e.currentTarget as HTMLButtonElement).style.color = "#8ab4d8"; }}
+        onMouseLeave={(e) => { if (activeTab !== "kalendarz") (e.currentTarget as HTMLButtonElement).style.color = "#4a6890"; }}>
+        Kalendarz GPW
+        {(() => { const now = new Date(); return now.getDay() === 6 && now.getHours() >= 10; })() && (
+          <span style={{ position: "absolute", top: 8, right: 8, width: 6, height: 6, borderRadius: "50%", background: "#25a060", boxShadow: "0 0 6px #25a060" }} />
+        )}
       </button>
-
-      {/* Trust level mini indicator w sidebarze */}
-      <div style={{ marginTop: "auto", padding: "12px 8px 0" }}>
-        <div style={{ fontSize: 8, color: "#3a5068", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-          Zaufanie do źródeł
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ flex: 1, height: 3, background: "rgba(30,50,80,0.6)", borderRadius: 2, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${Math.round(trustLevel * 100)}%`, background: "#4a8ac8", borderRadius: 2, transition: "width 0.3s" }} />
-          </div>
-          <span style={{ fontSize: 8, color: "#4a6890", minWidth: 24, textAlign: "right" }}>
-            {Math.round(trustLevel * 100)}%
-          </span>
-        </div>
-      </div>
     </aside>
   );
 
@@ -446,7 +456,7 @@ export default function Page() {
       </span>
 
       <div style={{ flex: 1, display: "flex", gap: 6 }}>
-        {(["centrum", "dashboard", "zrodla"] as ActiveTab[]).map((tab) => (
+        {(["centrum", "dashboard", "kalendarz"] as ActiveTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -457,9 +467,13 @@ export default function Page() {
               background: activeTab === tab ? "rgba(60,96,160,0.65)" : "rgba(20,32,54,0.7)",
               color: activeTab === tab ? "#f0f6ff" : "#4a6890",
               transition: "all 0.15s",
+              position: "relative",
             }}
           >
-            {tab === "centrum" ? "Centrum" : tab === "dashboard" ? "Rynki" : "Źródła"}
+            {tab === "centrum" ? "Centrum" : tab === "dashboard" ? "Rynki" : "GPW"}
+            {tab === "kalendarz" && (() => { const now = new Date(); return now.getDay() === 6 && now.getHours() >= 10; })() && (
+              <span style={{ position: "absolute", top: 4, right: 4, width: 5, height: 5, borderRadius: "50%", background: "#25a060" }} />
+            )}
           </button>
         ))}
       </div>
@@ -585,40 +599,10 @@ export default function Page() {
           </div>
         )}
 
-        {/* ── Źródła tab ─────────────────────────────────────────────── */}
-        {activeTab === "zrodla" && (
-          <div style={{ flex: 1, minWidth: 0, width: "100%", maxWidth: 680 }}>
-            <div className={styles.panel} style={{ padding: "20px 20px 28px" }}>
-              <div style={{ marginBottom: 20, display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#c8deff" }}>
-                    Zweryfikowane Źródła
-                  </div>
-                  <div style={{ fontSize: 9, color: "#3a5068", letterSpacing: "0.06em", marginTop: 3 }}>
-                    Kontroluj jak LLM korzysta z zaufanych autorów
-                  </div>
-                </div>
-                {token && (
-                  <button
-                    onClick={() => void handleTrustSave()}
-                    disabled={trustSaving}
-                    style={{
-                      fontSize: 9, padding: "5px 12px", borderRadius: 7, cursor: trustSaving ? "not-allowed" : "pointer",
-                      background: "rgba(40,70,130,0.6)", border: "1px solid rgba(80,130,200,0.3)",
-                      color: "#90c0f0", letterSpacing: "0.06em", textTransform: "uppercase",
-                      opacity: trustSaving ? 0.5 : 1,
-                    }}
-                  >
-                    {trustSaving ? "Zapisywanie..." : "Zapisz"}
-                  </button>
-                )}
-              </div>
-              <SourcesSettingsPanel
-                trustLevel={trustLevel}
-                onTrustChange={handleTrustChange}
-                saving={trustSaving}
-              />
-            </div>
+        {/* ── Kalendarz GPW tab ──────────────────────────────────────── */}
+        {activeTab === "kalendarz" && (
+          <div style={{ flex: 1, minWidth: 0, width: "100%", maxWidth: 960 }}>
+            <EarningsCalendar />
           </div>
         )}
 
@@ -633,6 +617,66 @@ export default function Page() {
                 <HeaderBar />
               </section>
 
+              {/* Sub-tabs: Briefy / Zweryfikowane Źródła */}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {([
+                  { key: "briefy" as CentrumSubTab, label: "Briefy" },
+                  { key: "zrodla" as CentrumSubTab, label: "Zweryfikowane Źródła" },
+                ]).map((st) => (
+                  <button
+                    key={st.key}
+                    onClick={() => setCentrumSubTab(st.key)}
+                    style={{
+                      padding: "7px 18px", borderRadius: 999, border: "none", cursor: "pointer",
+                      fontWeight: 600, fontSize: 11, letterSpacing: "0.05em",
+                      background: centrumSubTab === st.key ? "rgba(60,96,160,0.55)" : "rgba(20,32,54,0.7)",
+                      color: centrumSubTab === st.key ? "#f0f6ff" : "#4a6890",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Sub-tab: Zweryfikowane Źródła */}
+              {centrumSubTab === "zrodla" && (
+                <div className={styles.panel} style={{ padding: "20px 20px 28px" }}>
+                  <div style={{ marginBottom: 20, display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#c8deff" }}>
+                        Zweryfikowane Źródła
+                      </div>
+                      <div style={{ fontSize: 9, color: "#3a5068", letterSpacing: "0.06em", marginTop: 3 }}>
+                        Kontroluj jak LLM korzysta z zaufanych autorów
+                      </div>
+                    </div>
+                    {token && (
+                      <button
+                        onClick={() => void handleTrustSave()}
+                        disabled={trustSaving}
+                        style={{
+                          fontSize: 9, padding: "5px 12px", borderRadius: 7, cursor: trustSaving ? "not-allowed" : "pointer",
+                          background: "rgba(40,70,130,0.6)", border: "1px solid rgba(80,130,200,0.3)",
+                          color: "#90c0f0", letterSpacing: "0.06em", textTransform: "uppercase",
+                          opacity: trustSaving ? 0.5 : 1,
+                        }}
+                      >
+                        {trustSaving ? "Zapisywanie..." : "Zapisz"}
+                      </button>
+                    )}
+                  </div>
+                  <SourcesSettingsPanel
+                    trustLevel={trustLevel}
+                    onTrustChange={handleTrustChange}
+                    saving={trustSaving}
+                  />
+                </div>
+              )}
+
+              {/* Sub-tab: Briefy */}
+              {centrumSubTab === "briefy" && (<>
+
               <section className={styles.panel} style={{ display: "flex", flexDirection: "column", gap: 20, padding: "16px 14px" }}>
                 <StructuredBriefsPanel
                   onGenerate={handleStructuredBrief}
@@ -641,67 +685,7 @@ export default function Page() {
                   isMobile={isMobile}
                 />
 
-                {structuredBriefError && !structuredBriefId && (
-                  <div style={{ padding: "10px 14px", color: "#f87171", fontSize: 12, background: "rgba(90,20,20,0.2)", borderRadius: 8, border: "1px solid rgba(248,113,113,0.15)" }}>
-                    {structuredBriefError}
-                  </div>
-                )}
               </section>
-
-              {/* Structured brief result */}
-              {structuredBriefResult && !structuredBriefId && (
-                <section className={styles.panel} style={{ padding: "16px 14px" }}>
-                  {(() => {
-                    const r = structuredBriefResult;
-                    const summary = r.summary as Record<string, unknown>;
-                    let text = "";
-                    if (typeof summary.tl_dr === "string") text += summary.tl_dr + "\n\n";
-                    if (Array.isArray(summary.watki)) {
-                      for (const w of summary.watki as Array<{title?: string; body?: string}>) {
-                        if (w.title) text += `## ${w.title}\n`;
-                        if (w.body) text += `${w.body}\n\n`;
-                      }
-                    }
-                    if (!text && typeof summary.summary === "string") text = summary.summary;
-                    if (!text) text = JSON.stringify(summary, null, 2);
-                    const lines = text.split("\n");
-                    return (
-                      <div>
-                        <div style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(120,160,210,0.5)", marginBottom: 10 }}>
-                          Brief — {r.context}
-                        </div>
-                        <div style={{ fontSize: 13, lineHeight: 1.7, color: "#b0cce8" }}>
-                          {lines.map((line, i) => {
-                            const t = line.trim();
-                            if (!t) return <div key={i} style={{ height: 6 }} />;
-                            if (t.startsWith("## ")) return <div key={i} style={{ fontWeight: 700, color: "#d0e8ff", fontSize: 14, marginTop: 12, marginBottom: 3 }}>{t.slice(3)}</div>;
-                            if (t.startsWith("- ") || t.startsWith("• ")) return <div key={i} style={{ paddingLeft: 14, marginBottom: 2 }}><span style={{ color: "#3a6090", marginRight: 5 }}>•</span>{t.slice(2)}</div>;
-                            return <div key={i} style={{ marginBottom: 3 }}>{t}</div>;
-                          })}
-                        </div>
-                        {r.sources.length > 0 && (
-                          <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(80,120,180,0.15)" }}>
-                            <div style={{ fontSize: 9, color: "#1e3555", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Źródła</div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                              {r.sources.slice(0, 5).map((s, i) => (
-                                <div key={i} style={{ display: "flex", gap: 6 }}>
-                                  <span style={{ fontSize: 9, color: "#1e3555" }}>{i + 1}.</span>
-                                  {s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#3a6090", textDecoration: "none" }}>{s.title}</a> : <span style={{ fontSize: 11, color: "#3a6090" }}>{s.title}</span>}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        <div style={{ marginTop: 10, textAlign: "right" }}>
-                          <button onClick={() => { setStructuredBriefResult(null); setStructuredBriefError(null); }} style={{ fontSize: 10, color: "#2a4870", background: "transparent", border: "1px solid rgba(50,80,130,0.25)", borderRadius: 5, padding: "3px 10px", cursor: "pointer" }}>
-                            ✕ Wyczyść
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </section>
-              )}
 
               <section className={styles.panel} style={{ padding: "16px 14px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
@@ -735,10 +719,11 @@ export default function Page() {
                   <ThreadsPanel {...threadsPanelProps} />
                 </section>
               )}
+            </>)}
             </div>
 
-            {/* ThreadsPanel right column on desktop */}
-            {!isMobile && user && token && (
+            {/* ThreadsPanel right column on desktop — only in briefy sub-tab */}
+            {!isMobile && user && token && centrumSubTab === "briefy" && (
               <div style={{ width: 280, flexShrink: 0, position: "sticky", top: 26 }}>
                 <ThreadsPanel {...threadsPanelProps} />
               </div>

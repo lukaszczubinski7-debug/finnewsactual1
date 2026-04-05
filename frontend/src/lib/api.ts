@@ -15,6 +15,7 @@ import type {
   ThreadSuggestion,
   UserPreference,
   UserPreferenceUpdate,
+  VideoItem,
   YoutubeChannel,
   YoutubeSource,
 } from "./types";
@@ -27,6 +28,9 @@ const PROFILE_PREFERENCES_ENDPOINT = "/api/profile/preferences";
 const THREADS_ENDPOINT = "/api/threads";
 const MARKET_QUOTES_ENDPOINT = "/api/market/quotes";
 const MARKET_INSTRUMENTS_ENDPOINT = "/api/market/instruments";
+const EARNINGS_ENDPOINT = "/api/earnings";
+const EARNINGS_UPCOMING_ENDPOINT = "/api/earnings/upcoming";
+const PREGEN_BRIEFS_ENDPOINT = "/api/pregenerated-briefs";
 
 function parseTickers(tickers: string): string[] {
   return tickers
@@ -336,6 +340,8 @@ export async function postResearch(
   query: string,
   token?: string,
   sources_trust_level?: number,
+  source_weights?: Record<string, number>,
+  custom_x_handles?: { handle: string; name: string; weight: number }[],
 ): Promise<ResearchResponse> {
   const r = await fetch("/api/research", {
     method: "POST",
@@ -343,7 +349,12 @@ export async function postResearch(
       "Content-Type": "application/json; charset=utf-8",
       ...authHeaders(token),
     },
-    body: JSON.stringify({ query, sources_trust_level: sources_trust_level ?? 0.5 }),
+    body: JSON.stringify({
+      query,
+      sources_trust_level: sources_trust_level ?? 0.5,
+      source_weights: source_weights ?? {},
+      custom_x_handles: custom_x_handles ?? [],
+    }),
   });
   const p = await parseJsonSafe(r);
   if (!r.ok) throw parseApiError(p, r.status);
@@ -354,6 +365,27 @@ export async function postResearch(
 
 const YT_SOURCES = "/api/youtube/sources";
 const YT_CHANNELS = "/api/youtube/channels";
+const YT_CHANNEL_VIDEOS = "/api/youtube/channel-videos";
+
+export async function fetchChannelVideos(
+  channelId: string,
+  channelName: string,
+  dateFrom?: string,
+  dateTo?: string,
+  maxVideos = 20,
+): Promise<{ channel_id: string; channel_name: string; videos: VideoItem[] }> {
+  const params = new URLSearchParams({
+    channel_id: channelId,
+    channel_name: channelName,
+    max_videos: String(maxVideos),
+  });
+  if (dateFrom) params.set("date_from", dateFrom);
+  if (dateTo) params.set("date_to", dateTo);
+  const r = await fetch(`${YT_CHANNEL_VIDEOS}?${params}`, { cache: "no-store" });
+  const p = await parseJsonSafe(r);
+  if (!r.ok) throw parseApiError(p, r.status);
+  return p as { channel_id: string; channel_name: string; videos: VideoItem[] };
+}
 
 export async function getYoutubeSources(token: string): Promise<YoutubeSource[]> {
   const r = await fetch(YT_SOURCES, { cache: "no-store", headers: authHeaders(token) });
@@ -404,4 +436,32 @@ export async function deleteYoutubeChannel(token: string, id: number): Promise<v
 export async function refreshYoutubeChannels(token: string): Promise<void> {
   const r = await fetch(`${YT_CHANNELS}/refresh`, { method: "POST", headers: authHeaders(token) });
   if (!r.ok) { const p = await parseJsonSafe(r); throw parseApiError(p, r.status); }
+}
+
+export async function getEarningsCalendar(): Promise<import("./types").EarningsDay[]> {
+  const r = await fetch(EARNINGS_ENDPOINT, { cache: "no-store" });
+  const p = await parseJsonSafe(r);
+  if (!r.ok) throw parseApiError(p, r.status);
+  return p as import("./types").EarningsDay[];
+}
+
+export async function getEarningsUpcoming(market?: string, days?: number): Promise<import("./types").EarningsDay[]> {
+  const params = new URLSearchParams();
+  if (market) params.set("market", market);
+  if (days) params.set("days", String(days));
+  const qs = params.toString();
+  const url = qs ? `${EARNINGS_UPCOMING_ENDPOINT}?${qs}` : EARNINGS_UPCOMING_ENDPOINT;
+  const r = await fetch(url, { cache: "no-store" });
+  const p = await parseJsonSafe(r);
+  if (!r.ok) throw parseApiError(p, r.status);
+  return p as import("./types").EarningsDay[];
+}
+
+// ── Pre-generated Briefs ─────────────────────────────────────────────────────
+
+export async function getPreGeneratedBriefs(): Promise<import("./types").PreGeneratedBriefsResponse> {
+  const r = await fetch(PREGEN_BRIEFS_ENDPOINT, { cache: "no-store" });
+  const p = await parseJsonSafe(r);
+  if (!r.ok) return { briefs: [] };
+  return p as import("./types").PreGeneratedBriefsResponse;
 }

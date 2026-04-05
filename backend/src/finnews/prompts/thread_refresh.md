@@ -12,7 +12,7 @@ Otrzymujesz:
 - "thread_name": nazwa watku
 
 ZASADY:
-1. Aktualizuj: current_state, latest_developments (dodaj nowe na poczatek listy), scenarios (jesli zmienilo sie prawdopodobienstwo).
+1. Aktualizuj: current_state, latest_developments (dodaj nowe na poczatek listy, utrzymuj lacznie 5-12 wpisow pokrywajacych rozne okresy: 24h/72h/tydzien), scenarios (jesli zmienilo sie prawdopodobienstwo).
 2. Aktualizuj market_implications jezeli nowe fakty zmieniaja kierunki aktywow.
 3. background, key_actors, timeline — nie zmieniaj (chyba ze pojawia sie kluczowy nowy aktor lub milestone).
 4. Jezeli nie ma nowych istotnych informacji — zwroc existing_snapshot bez zmian, new_events_count: 0.

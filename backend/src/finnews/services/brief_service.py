@@ -17,6 +17,7 @@ from finnews.errors import NewsDataParsingError, UpstreamNewsProviderError
 from finnews.services.news_details_service import NewsDetailsService
 from finnews.services.news_list_service import NewsListService
 from finnews.services.selection_service import pick_top
+from finnews.services.verified_source_service import VerifiedSourceService
 from finnews.services.web_search_service import WebSearchService
 from finnews.settings import settings
 from finnews.utils.region import normalize_region
@@ -36,11 +37,13 @@ ALIASES: dict[str, list[str]] = {
 
 CONTEXT_GEOPOLITICS = "Geopolityka"
 CONTEXT_MACRO = "Makro"
+CONTEXT_TECHNOLOGY = "Technologia"
 CONTEXT_EARNINGS = "Wyniki spolek (earnings)"
 CONTEXT_RATES = "Stopy / banki centralne"
 CONTEXT_COMMODITIES = "Surowce / energia"
 CONTEXT_CRYPTO = "Crypto"
 CONTEXT_POLAND = "Polska / GPW"
+CONTEXT_EVENTS = "Wydarzenia korporacyjne"
 
 DEFAULT_CONTEXT = CONTEXT_GEOPOLITICS
 DEFAULT_CONTINENTS = ["NA"]
@@ -239,6 +242,75 @@ CONTEXT_KEYWORDS: dict[str, list[str]] = {
         "economy",
         "recession",
         "macro",
+    ],
+    CONTEXT_TECHNOLOGY: [
+        "ai",
+        "artificial intelligence",
+        "machine learning",
+        "llm",
+        "gpt",
+        "claude",
+        "gemini",
+        "openai",
+        "anthropic",
+        "deepmind",
+        "cloud",
+        "semiconductor",
+        "semiconductors",
+        "chip",
+        "chips",
+        "tsmc",
+        "software",
+        "cybersecurity",
+        "big tech",
+        "oracle",
+        "microsoft",
+        "google",
+        "meta",
+        "amazon",
+        "apple",
+        "nvidia",
+        "startup",
+        "technology",
+        "tech",
+        "robotics",
+        "autonomous",
+        "quantum",
+        "saas",
+        "funding",
+        "series a",
+        "series b",
+        "ipo",
+        "launch",
+        "product launch",
+    ],
+    CONTEXT_EVENTS: [
+        "acquisition",
+        "merger",
+        "takeover",
+        "layoff",
+        "layoffs",
+        "fired",
+        "restructuring",
+        "bankruptcy",
+        "ipo",
+        "deal",
+        "billion",
+        "million",
+        "ceo",
+        "resign",
+        "appointed",
+        "antitrust",
+        "fine",
+        "lawsuit",
+        "settlement",
+        "partnership",
+        "joint venture",
+        "spin-off",
+        "spinoff",
+        "buyout",
+        "stake",
+        "divest",
     ],
     CONTEXT_EARNINGS: [
         "earnings",
@@ -1944,7 +2016,12 @@ def _to_brief_items(summary: dict[str, Any], *, style: str, framing: str) -> lis
             title = _safe_block_title(str(item.get("title") or "").strip(), f"Temat {idx + 1}")
             body = _compress_to_paragraph(str(item.get("body") or ""), min_sentences=2, max_sentences=3)
             if body:
-                items.append({"title": title, "body": body})
+                entry: dict[str, str] = {"title": title, "body": body}
+                if item.get("source_tag"):
+                    entry["source_tag"] = str(item["source_tag"])
+                if item.get("source_name"):
+                    entry["source_name"] = str(item["source_name"])
+                items.append(entry)
         # If LLM returned new-format items key, never fall through to old-format fallback
         # (which fills bodies with placeholder text). Return whatever we have (including empty).
         if has_items_key:
@@ -2215,12 +2292,38 @@ def _normalize_unified_summary(
             }
         )
     _, max_items = _item_bounds_for_style(style)
-    return {
+    result: dict[str, Any] = {
         "headline": _non_empty_text(enriched.get("headline"), "Krotki briefing geopolityczno-rynkowy"),
         "mode": _mode_from_style(style),
         "items": items[:max_items],
         "sources": output_sources,
     }
+    # Preserve new structured fields from LLM response
+    kt = base.get("key_takeaway")
+    if kt and str(kt).strip():
+        result["key_takeaway"] = str(kt).strip()
+    elif items:
+        # Fallback: use first item body as key_takeaway
+        first_body = items[0].get("body", "")
+        if first_body:
+            sentences = [s.strip() for s in first_body.split(".") if s.strip()]
+            result["key_takeaway"] = (sentences[0] + ".") if sentences else ""
+
+    # Collect verified_sources_used: from LLM response OR auto-detect from items
+    verified_used = base.get("verified_sources_used")
+    if isinstance(verified_used, list) and verified_used:
+        result["verified_sources_used"] = [str(s) for s in verified_used if s]
+    else:
+        # Auto-collect from items with source_tag="verified"
+        auto_verified = list({
+            item.get("source_name", "")
+            for item in items
+            if item.get("source_tag") == "verified" and item.get("source_name")
+        })
+        if auto_verified:
+            result["verified_sources_used"] = sorted(auto_verified)
+
+    return result
 
 
 def _build_prompt_sources(
@@ -2243,6 +2346,58 @@ def _build_prompt_sources(
             }
         )
     return prompt_sources
+
+
+def _merge_prompt_sources(*groups: list[dict[str, str]]) -> list[dict[str, str]]:
+    merged: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for group in groups:
+        for item in group:
+            title = normalize_text(str(item.get("title") or "")).strip()
+            url = normalize_text(str(item.get("url") or "")).strip()
+            key = f"{title}|{url}"
+            if not title or key in seen:
+                continue
+            seen.add(key)
+            merged.append(
+                {
+                    "title": title,
+                    "summary": normalize_text(str(item.get("summary") or "")).strip(),
+                    "publisher": normalize_text(str(item.get("publisher") or item.get("provider") or "")).strip(),
+                    "published_at": normalize_text(str(item.get("published_at") or "")).strip(),
+                    "url": url,
+                    "verified": item.get("verified", "false"),
+                    "source_weight": str(item.get("weight") or ""),
+                    "source_category": normalize_text(str(item.get("category") or "")).strip(),
+                    "source_topics": normalize_text(str(item.get("topics") or "")).strip(),
+                }
+            )
+    return merged
+
+
+def _merge_response_sources(
+    base_sources: list[dict[str, Any]],
+    verified_sources: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in [*verified_sources, *base_sources]:
+        title = normalize_text(str(item.get("title") or "")).strip()
+        url = normalize_text(str(item.get("url") or "")).strip()
+        key = f"{title}|{url}"
+        if not title or key in seen:
+            continue
+        seen.add(key)
+        merged.append(
+            {
+                "id": str(item.get("id") or key),
+                "title": title,
+                "provider": normalize_text(str(item.get("provider") or item.get("publisher") or "")).strip(),
+                "published_at": normalize_text(str(item.get("published_at") or "")).strip() or None,
+                "url": url or None,
+            }
+        )
+    return merged
 
 
 def _build_fallback_summary(
@@ -2334,6 +2489,30 @@ async def _fix_with_critic_feedback(
         return brief
 
 
+def _build_verified_policy(trust_level: float) -> str:
+    """Build verified source policy instruction based on trust level."""
+    if trust_level >= 0.7:
+        return (
+            "OBOWIAZKOWE — opieraj brief GLOWNIE na verified_sources. "
+            "Kazdy item MUSI zawierac co najmniej 1 fakt z verified source. "
+            "Jesli verified source nie pokrywa tematu — pominij blok zamiast wypelniac go ogolnymi mediami. "
+            "W source_tag oznacz 'verified' dla itemow opartych na verified_sources. "
+            "W verified_sources_used wymien WSZYSTKIE nazwy uzytych zweryfikowanych zrodel."
+        )
+    if trust_level >= 0.4:
+        return (
+            "PREFEROWANE — priorytetyzuj verified_sources. "
+            "Jesli verified source dostarcza informacje o danym temacie — uzyj jej jako pierwszej i oznacz source_tag='verified'. "
+            "Uzupelniaj ogolnymi mediami tylko tematy nie pokryte przez verified sources. "
+            "W verified_sources_used wymien nazwy faktycznie uzytych zweryfikowanych zrodel."
+        )
+    return (
+        "DODATKOWE — uwzglednij verified_sources jako zrodla o wyzszej wiarygodnosci. "
+        "Cytuj je gdy sa dostepne i oznacz source_tag='verified'. "
+        "W verified_sources_used wymien nazwy uzytych zweryfikowanych zrodel (pusta lista jesli nie uzyto)."
+    )
+
+
 async def _generate_summary_via_llm(
     *,
     style: str,
@@ -2345,6 +2524,7 @@ async def _generate_summary_via_llm(
     sources_for_prompt: list[dict[str, str]],
     preference_context: str | None = None,
     stylistic_instruction: str | None = None,
+    sources_trust_level: float = 0.0,
 ) -> dict[str, Any]:
     template_name = _prompt_template_name_for_style(style, preference_context=preference_context)
     system_prompt = "\n\n".join(
@@ -2355,6 +2535,21 @@ async def _generate_summary_via_llm(
             "Zwroc wylacznie JSON, bez markdown.",
         ]
     )
+    verified_sources = [
+        {
+            "title": source.get("title", ""),
+            "publisher": source.get("publisher", ""),
+            "published_at": source.get("published_at", ""),
+            "url": source.get("url", ""),
+            "summary": source.get("summary", ""),
+            "source_weight": source.get("source_weight", ""),
+            "source_category": source.get("source_category", ""),
+            "source_topics": source.get("source_topics", ""),
+        }
+        for source in sources_for_prompt
+        if str(source.get("verified", "false")).lower() == "true"
+    ]
+
     user_payload = {
         "today": datetime.now(UTC).strftime("%Y-%m-%d"),
         "context": context,
@@ -2365,6 +2560,13 @@ async def _generate_summary_via_llm(
         "continents": continents,
         "user_preference_context": preference_context or "",
         "stylistic_instruction": stylistic_instruction or "",
+        "sources_trust_level": sources_trust_level,
+        "verified_source_policy": (
+            _build_verified_policy(sources_trust_level)
+            if verified_sources
+            else ""
+        ),
+        "verified_sources": verified_sources,
         "sources": sources_for_prompt,
     }
 
@@ -2514,6 +2716,7 @@ class BriefService:
         self.list_service = NewsListService(self.client)
         self.details_service = NewsDetailsService(self.client)
         self.web_search_service = WebSearchService()
+        self.verified_source_service = VerifiedSourceService()
         self.llm_client = LLMClient()
         self._brief_cache: dict[tuple[Any, ...], tuple[float, dict[str, Any]]] = {}
 
@@ -2532,6 +2735,9 @@ class BriefService:
         summary_k: int,
         debug: bool,
         preference_context: str | None,
+        sources_trust_level: float,
+        source_weights: dict[str, float] | None,
+        custom_x_handles: list[dict[str, Any]] | None,
     ) -> tuple[Any, ...]:
         return (
             tuple(continents),
@@ -2546,6 +2752,18 @@ class BriefService:
             summary_k,
             debug,
             preference_context or "",
+            round(float(sources_trust_level or 0.0), 2),
+            tuple(sorted((source_weights or {}).items())),
+            tuple(
+                sorted(
+                    (
+                        str(item.get("handle") or "").strip(),
+                        round(float(item.get("weight", 1.0) or 1.0), 2),
+                    )
+                    for item in (custom_x_handles or [])
+                    if isinstance(item, dict)
+                )
+            ),
         )
 
     def _get_cached_result(self, cache_key: tuple[Any, ...]) -> dict[str, Any] | None:
@@ -2596,6 +2814,9 @@ class BriefService:
         request_id: str | None = None,
         continents: list[str] | None = None,
         preference_context: str | None = None,
+        sources_trust_level: float = 0.0,
+        source_weights: dict[str, float] | None = None,
+        custom_x_handles: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         normalized_style = normalize_style(style)
         normalized_preference_context = normalize_text(preference_context or "").strip() or None
@@ -2650,6 +2871,9 @@ class BriefService:
             summary_k=effective_summary_k,
             debug=debug,
             preference_context=normalized_preference_context,
+            sources_trust_level=sources_trust_level,
+            source_weights=source_weights,
+            custom_x_handles=custom_x_handles,
         )
 
         scoring_query = normalized_query
@@ -2762,9 +2986,20 @@ class BriefService:
                 details = await self.details_service.fetch_normalized_many(detail_ids)
                 details_by_id = {str(detail.get("id")): detail for detail in details if detail.get("id")}
             sources = _build_sources(selected_entries, details_by_id=details_by_id)
+            verified_prompt_sources = await self.verified_source_service.fetch_for_brief(
+                context=normalized_context,
+                query=normalized_query,
+                geo_focus=normalized_geo_focus,
+                preference_context=normalized_preference_context,
+                trust_level=sources_trust_level,
+                source_weights=source_weights,
+                custom_x_handles=custom_x_handles,
+            )
+            if verified_prompt_sources:
+                sources = _merge_response_sources(sources, verified_prompt_sources)
 
             summary_status = "ok"
-            if not summary_entries:
+            if not summary_entries and not verified_prompt_sources:
                 summary_status = "fallback"
                 fallback_reason = fetch_error_reason or "No news items selected after filtering/scoring."
                 structured_summary = _build_fallback_summary(
@@ -2777,7 +3012,10 @@ class BriefService:
                 )
                 prompt_sources: list[dict[str, str]] = []
             else:
-                prompt_sources = _build_prompt_sources(summary_entries, details_by_id=details_by_id)
+                prompt_sources = _merge_prompt_sources(
+                    _build_prompt_sources(summary_entries, details_by_id=details_by_id),
+                    verified_prompt_sources,
+                )
                 try:
                     if settings.openai_api_key:
                         llm_summary = await _generate_summary_via_llm(
@@ -2790,6 +3028,7 @@ class BriefService:
                             sources_for_prompt=prompt_sources,
                             preference_context=normalized_preference_context,
                             stylistic_instruction=str(brief_context.get("response_style") or ""),
+                            sources_trust_level=sources_trust_level,
                         )
                         structured_summary = _normalize_unified_summary(
                             llm_summary,

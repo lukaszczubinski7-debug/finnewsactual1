@@ -3,13 +3,12 @@
 import { useState } from "react";
 import type { Thread, ThreadScenario, ThreadDevelopment, ThreadAsset } from "../lib/types";
 
-type Tab = "teraz" | "historia" | "scenariusze" | "rynki";
+type Tab = "teraz" | "geneza" | "scenariusze";
 
 const tabs: { key: Tab; label: string }[] = [
   { key: "teraz", label: "Teraz" },
-  { key: "historia", label: "Historia" },
+  { key: "geneza", label: "Geneza" },
   { key: "scenariusze", label: "Scenariusze" },
-  { key: "rynki", label: "Wpływ na rynki" },
 ];
 
 const sectionLabel: React.CSSProperties = {
@@ -37,6 +36,87 @@ function DirectionArrow({ dir }: { dir: string }) {
   if (dir === "up") return <span style={{ color: "#60d090" }}>↑</span>;
   if (dir === "down") return <span style={{ color: "#f07070" }}>↓</span>;
   return <span style={{ color: "#f0c060" }}>↔</span>;
+}
+
+/** Splits developments into tiers by date relative to today */
+function tierDevelopments(devs: ThreadDevelopment[]): {
+  h24: ThreadDevelopment[];
+  h72: ThreadDevelopment[];
+  week: ThreadDevelopment[];
+  older: ThreadDevelopment[];
+} {
+  const now = Date.now();
+  const DAY = 86400000;
+  const tiers = { h24: [] as ThreadDevelopment[], h72: [] as ThreadDevelopment[], week: [] as ThreadDevelopment[], older: [] as ThreadDevelopment[] };
+  for (const dev of devs) {
+    const parsed = dev.date ? Date.parse(dev.date) : NaN;
+    if (isNaN(parsed)) {
+      tiers.older.push(dev);
+      continue;
+    }
+    const age = now - parsed;
+    if (age <= DAY) tiers.h24.push(dev);
+    else if (age <= 3 * DAY) tiers.h72.push(dev);
+    else if (age <= 7 * DAY) tiers.week.push(dev);
+    else tiers.older.push(dev);
+  }
+  return tiers;
+}
+
+function DevCard({ dev }: { dev: ThreadDevelopment }) {
+  return (
+    <div style={card}>
+      <div style={{ color: "#7a9abc", fontSize: 12, marginBottom: 4 }}>{dev.date}</div>
+      <div style={{ color: "#dce9ff", fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{dev.title}</div>
+      <p style={{ margin: 0, color: "#c6d8f4", fontSize: 14, lineHeight: 1.6 }}>{dev.body}</p>
+    </div>
+  );
+}
+
+function TieredNews({ devs }: { devs: ThreadDevelopment[] }) {
+  if (devs.length === 0) return null;
+  const { h24, h72, week, older } = tierDevelopments(devs);
+
+  // If no tiering possible (all older / no dates), just show all flat
+  const hasAnyTier = h24.length > 0 || h72.length > 0 || week.length > 0;
+
+  if (!hasAnyTier) {
+    return (
+      <div style={{ display: "grid", gap: 10 }}>
+        <div style={sectionLabel}>Ostatnie zdarzenia</div>
+        {devs.map((dev, i) => <DevCard key={i} dev={dev} />)}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 18 }}>
+      {h24.length > 0 && (
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ ...sectionLabel, color: "#90d0a0" }}>Ostatnie 24h ({h24.length})</div>
+          {h24.slice(0, 5).map((dev, i) => <DevCard key={i} dev={dev} />)}
+        </div>
+      )}
+      {h72.length > 0 && (
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ ...sectionLabel, color: "#c0c870" }}>24–72h ({h72.length})</div>
+          {h72.slice(0, 3).map((dev, i) => <DevCard key={i} dev={dev} />)}
+        </div>
+      )}
+      {week.length > 0 && (
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ ...sectionLabel, color: "#9fb6d8" }}>Ostatni tydzień ({week.length})</div>
+          {week.slice(0, 2).map((dev, i) => <DevCard key={i} dev={dev} />)}
+        </div>
+      )}
+      {older.length > 0 && (
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={sectionLabel}>Starsze</div>
+          {older.map((dev, i) => <DevCard key={i} dev={dev} />)}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function ThreadDetail({ thread, onClose }: { thread: Thread; onClose: () => void }) {
@@ -121,39 +201,77 @@ export default function ThreadDetail({ thread, onClose }: { thread: Thread; onCl
             {/* TAB: Teraz */}
             {tab === "teraz" && (
               <div style={{ display: "grid", gap: 16 }}>
+                {/* Aktualna sytuacja */}
                 {snap.current_state && (
                   <div style={card}>
-                    <div style={sectionLabel}>Stan bieżący</div>
+                    <div style={sectionLabel}>Aktualna sytuacja</div>
                     <p style={{ margin: 0, color: "#d6e6ff", fontSize: 16, lineHeight: 1.7 }}>
                       {snap.current_state}
                     </p>
                   </div>
                 )}
-                {(snap.latest_developments ?? []).length > 0 && (
+
+                {/* Wpływ na rynki */}
+                {(snap.market_implications?.correlation_map || (snap.market_implications?.assets ?? []).length > 0 || (snap.market_implications?.sectors ?? []).length > 0) && (
                   <div style={{ display: "grid", gap: 10 }}>
-                    <div style={sectionLabel}>Ostatnie zdarzenia</div>
-                    {(snap.latest_developments as ThreadDevelopment[]).map((dev, i) => (
-                      <div key={i} style={card}>
-                        <div style={{ color: "#7a9abc", fontSize: 12, marginBottom: 4 }}>{dev.date}</div>
-                        <div style={{ color: "#dce9ff", fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
-                          {dev.title}
-                        </div>
-                        <p style={{ margin: 0, color: "#c6d8f4", fontSize: 14, lineHeight: 1.6 }}>
-                          {dev.body}
+                    <div style={{ ...sectionLabel, color: "#d0a060" }}>Wpływ na rynki</div>
+                    {snap.market_implications?.correlation_map && (
+                      <div style={card}>
+                        <div style={{ color: "#9fb6d8", fontSize: 13, marginBottom: 6 }}>Mechanizm transmisji</div>
+                        <p style={{ margin: 0, color: "#d6e6ff", fontSize: 14, lineHeight: 1.7 }}>
+                          {snap.market_implications.correlation_map}
                         </p>
                       </div>
-                    ))}
+                    )}
+                    {(snap.market_implications?.assets ?? []).length > 0 && (
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {(snap.market_implications!.assets as ThreadAsset[]).map((a, i) => (
+                          <div key={i} style={{ ...card, display: "flex", alignItems: "center", gap: 12 }}>
+                            <DirectionArrow dir={a.direction} />
+                            <span style={{ color: "#dce9ff", fontWeight: 700, minWidth: 80 }}>{a.asset}</span>
+                            <span style={{ color: "#9fb6d8", fontSize: 14, flex: 1 }}>{a.why}</span>
+                            <span style={{ color: "#7a9abc", fontSize: 12 }}>{a.confidence}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {(snap.market_implications?.sectors ?? []).length > 0 && (
+                      <div style={card}>
+                        <div style={{ color: "#9fb6d8", fontSize: 13, marginBottom: 8 }}>Sektory</div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {snap.market_implications!.sectors!.map((s, i) => (
+                            <span
+                              key={i}
+                              style={{
+                                padding: "4px 12px",
+                                borderRadius: 999,
+                                background: "rgba(80,120,180,0.2)",
+                                color: "#9fb6d8",
+                                fontSize: 13,
+                              }}
+                            >
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
+                )}
+
+                {/* Tiered news */}
+                {(snap.latest_developments ?? []).length > 0 && (
+                  <TieredNews devs={snap.latest_developments as ThreadDevelopment[]} />
                 )}
               </div>
             )}
 
-            {/* TAB: Historia */}
-            {tab === "historia" && (
+            {/* TAB: Geneza */}
+            {tab === "geneza" && (
               <div style={{ display: "grid", gap: 16 }}>
                 {snap.background && (
                   <div style={card}>
-                    <div style={sectionLabel}>Tło historyczne</div>
+                    <div style={sectionLabel}>Historia konfliktu</div>
                     <p style={{ margin: 0, color: "#d6e6ff", fontSize: 15, lineHeight: 1.7 }}>
                       {snap.background}
                     </p>
@@ -213,58 +331,10 @@ export default function ThreadDetail({ thread, onClose }: { thread: Thread; onCl
                     </div>
                     <div style={{ display: "grid", gap: 4, fontSize: 14 }}>
                       <div><span style={{ color: "#7a9abc" }}>Trigger: </span><span style={{ color: "#c6d8f4" }}>{sc.trigger}</span></div>
-                      <div><span style={{ color: "#7a9abc" }}>Wpływ: </span><span style={{ color: "#c6d8f4" }}>{sc.market_impact}</span></div>
+                      <div><span style={{ color: "#7a9abc" }}>Wpływ na rynki: </span><span style={{ color: "#c6d8f4" }}>{sc.market_impact}</span></div>
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-
-            {/* TAB: Rynki */}
-            {tab === "rynki" && (
-              <div style={{ display: "grid", gap: 16 }}>
-                {snap.market_implications?.correlation_map && (
-                  <div style={card}>
-                    <div style={sectionLabel}>Mechanizm transmisji</div>
-                    <p style={{ margin: 0, color: "#d6e6ff", fontSize: 15, lineHeight: 1.7 }}>
-                      {snap.market_implications.correlation_map}
-                    </p>
-                  </div>
-                )}
-                {(snap.market_implications?.assets ?? []).length > 0 && (
-                  <div style={{ display: "grid", gap: 8 }}>
-                    <div style={sectionLabel}>Aktywa wrazliwe</div>
-                    {(snap.market_implications!.assets as ThreadAsset[]).map((a, i) => (
-                      <div key={i} style={{ ...card, display: "flex", alignItems: "center", gap: 12 }}>
-                        <DirectionArrow dir={a.direction} />
-                        <span style={{ color: "#dce9ff", fontWeight: 700, minWidth: 80 }}>{a.asset}</span>
-                        <span style={{ color: "#9fb6d8", fontSize: 14, flex: 1 }}>{a.why}</span>
-                        <span style={{ color: "#7a9abc", fontSize: 12 }}>{a.confidence}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {(snap.market_implications?.sectors ?? []).length > 0 && (
-                  <div style={card}>
-                    <div style={sectionLabel}>Sektory</div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                      {snap.market_implications!.sectors!.map((s, i) => (
-                        <span
-                          key={i}
-                          style={{
-                            padding: "4px 12px",
-                            borderRadius: 999,
-                            background: "rgba(80,120,180,0.2)",
-                            color: "#9fb6d8",
-                            fontSize: 13,
-                          }}
-                        >
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </>

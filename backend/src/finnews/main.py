@@ -14,7 +14,8 @@ from finnews.api.routes_market import router as market_router
 from finnews.api.routes_threads import router as threads_router
 from finnews.api.routes_youtube import router as youtube_router
 from finnews.api.routes_research import router as research_router
-from finnews.scheduler import start_scheduler, stop_scheduler
+from finnews.api.routes_earnings import router as earnings_router
+from finnews.scheduler import start_scheduler, stop_scheduler, generate_pregenerated_if_empty
 from finnews.settings import settings
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -36,11 +37,15 @@ app.include_router(profile_router)
 app.include_router(threads_router)
 app.include_router(youtube_router)
 app.include_router(research_router)
+app.include_router(earnings_router)
 
 
 @app.on_event("startup")
 async def on_startup() -> None:
+    import asyncio
     start_scheduler()
+    # Generate pre-gen briefs in background if DB is empty
+    asyncio.create_task(generate_pregenerated_if_empty())
 
 
 @app.on_event("shutdown")

@@ -16,6 +16,8 @@ async def post_research(req: ResearchRequest) -> ResearchResponse:
     result = await _service.run(
         query=req.query,
         sources_trust_level=req.sources_trust_level,
+        source_weights=req.source_weights or None,
+        custom_x_handles=req.custom_x_handles or None,
     )
     return ResearchResponse(
         report=result["report"],

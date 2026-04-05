@@ -75,6 +75,86 @@ async def _run_all_thread_refreshes() -> None:
     logger.info("scheduler: done refreshing %d threads", len(threads))
 
 
+async def _refresh_earnings_data() -> None:
+    """Refresh earnings calendar data from strefainwestorow.pl."""
+    from finnews.db.session import SessionLocal
+    from finnews.services.earnings_service import EarningsService
+
+    svc = EarningsService()
+    try:
+        with SessionLocal() as db:
+            count = await svc.refresh_wse(db)
+        logger.info("scheduler: refreshed %d earnings events", count)
+    except Exception as exc:
+        logger.error("scheduler: earnings refresh failed: %s", exc)
+
+
+PREGEN_CONTEXTS = ["Technologia", "Makro", "Geopolityka"]
+
+
+async def _generate_pregenerated_briefs() -> None:
+    """Generate pre-computed briefs for all users (public, no auth)."""
+    from finnews.db.session import SessionLocal
+    from finnews.models.pregenerated_brief import PreGeneratedBrief
+    from finnews.services.brief_service import BriefService
+
+    svc = BriefService()
+
+    for ctx in PREGEN_CONTEXTS:
+        try:
+            logger.info("scheduler: generating pre-gen brief context=%s", ctx)
+            svc._brief_cache.clear()
+            result = await svc.run(
+                region=None,
+                tickers=None,
+                query=None,
+                list_limit=30,
+                summary_k=5,
+                style="mid",
+                continents=["NA", "EU", "AS", "ME", "SA", "AF", "OC"],
+                context=ctx,
+                window_hours=72,
+                sources_trust_level=0.3,
+            )
+
+            with SessionLocal() as db:
+                from datetime import datetime, timezone
+                now = datetime.now(timezone.utc)
+                existing = db.query(PreGeneratedBrief).filter_by(context=ctx).first()
+                if existing:
+                    existing.response_payload = result
+                    existing.generated_at = now
+                    existing.status = "ready"
+                else:
+                    db.add(PreGeneratedBrief(
+                        context=ctx,
+                        response_payload=result,
+                        generated_at=now,
+                        status="ready",
+                    ))
+                db.commit()
+            logger.info("scheduler: pre-gen brief OK context=%s", ctx)
+        except Exception as exc:
+            logger.error("scheduler: pre-gen brief FAILED context=%s error=%s", ctx, exc)
+
+    logger.info("scheduler: finished generating %d pre-gen briefs", len(PREGEN_CONTEXTS))
+
+
+async def generate_pregenerated_if_empty() -> None:
+    """Generate briefs on startup if DB is empty."""
+    from finnews.db.session import SessionLocal
+    from finnews.models.pregenerated_brief import PreGeneratedBrief
+
+    with SessionLocal() as db:
+        count = db.query(PreGeneratedBrief).count()
+
+    if count < len(PREGEN_CONTEXTS):
+        logger.info("scheduler: DB has %d pre-gen briefs, generating...", count)
+        await _generate_pregenerated_briefs()
+    else:
+        logger.info("scheduler: %d pre-gen briefs already in DB, skipping startup gen", count)
+
+
 def start_scheduler() -> None:
     global _scheduler
     if not settings.scheduler_enabled:
@@ -92,8 +172,31 @@ def start_scheduler() -> None:
         trigger = CronTrigger(hour=6, minute=0)  # fallback: 06:00 UTC daily
 
     _scheduler.add_job(_run_all_thread_refreshes, trigger=trigger, id="refresh_all_threads", replace_existing=True)
+
+    # Earnings calendar refresh (default: 07:00 UTC = 09:00 CET)
+    earnings_parts = settings.earnings_refresh_cron.split()
+    if len(earnings_parts) == 5:
+        e_min, e_hour, e_day, e_month, e_dow = earnings_parts
+        earnings_trigger = CronTrigger(
+            minute=e_min, hour=e_hour, day=e_day, month=e_month, day_of_week=e_dow
+        )
+    else:
+        earnings_trigger = CronTrigger(hour=7, minute=0)
+    _scheduler.add_job(_refresh_earnings_data, trigger=earnings_trigger, id="refresh_earnings", replace_existing=True)
+
+    # Pre-generated briefs refresh (default: every 4h)
+    pregen_parts = settings.pregen_briefs_cron.split()
+    if len(pregen_parts) == 5:
+        p_min, p_hour, p_day, p_month, p_dow = pregen_parts
+        pregen_trigger = CronTrigger(
+            minute=p_min, hour=p_hour, day=p_day, month=p_month, day_of_week=p_dow
+        )
+    else:
+        pregen_trigger = CronTrigger(hour="*/4", minute=15)
+    _scheduler.add_job(_generate_pregenerated_briefs, trigger=pregen_trigger, id="gen_pregenerated_briefs", replace_existing=True)
+
     _scheduler.start()
-    logger.info("scheduler: started (cron=%s)", settings.scheduler_refresh_cron)
+    logger.info("scheduler: started (threads_cron=%s, earnings_cron=%s)", settings.scheduler_refresh_cron, settings.earnings_refresh_cron)
 
 
 def stop_scheduler() -> None:
